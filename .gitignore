@@ -1,0 +1,28 @@
+# Binaries
+/tokensched
+/dist/
+*.exe
+*.out
+*.test
+
+# Go workspace / module cache artifacts
+go.work
+go.work.sum
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Assistant scratch (never commit)
+.claude/
+CLAUDE.md
+
+# build scratch
+BUILD_SETUP_NEXT_STEPS.md
+PUBLISH_BLOCKED.md
+.spawn.*
+.builder_*
+.build_metadata*
+.stage_*
