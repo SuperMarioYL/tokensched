@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="560" viewBox="0 0 860 560" font-family="'SF Mono','JetBrains Mono','Fira Code',Menlo,Consolas,monospace" role="img" aria-label="tokensched run replays an over-budget task tree: low-value nodes down-tiered to Haiku, high-value nodes kept on Opus, window not blown.">
+  <defs>
+    <style>
+      .bg     { fill: #11131a; }
+      .titlebar { fill: #1b1e27; }
+      .dot-r  { fill: #ff5f56; }
+      .dot-y  { fill: #ffbd2e; }
+      .dot-g  { fill: #27c93f; }
+      .t      { fill: #c9d1d9; font-size: 14px; }
+      .tab    { fill: #8b949e; font-size: 14px; }
+      .prompt { fill: #3cb371; font-size: 14px; font-weight: 700; }
+      .cmd    { fill: #e6edf3; font-size: 14px; }
+      .flag   { fill: #7aa2f7; font-size: 14px; }
+      .title  { fill: #f2b705; font-size: 14px; font-weight: 700; }
+      .sub    { fill: #8a8a8a; font-size: 12.5px; }
+      .head   { fill: #7aa2f7; font-size: 13px; font-weight: 700; }
+      .keep   { fill: #3cb371; font-size: 13px; }
+      .down   { fill: #f2b705; font-size: 13px; }
+      .pre    { fill: #e5484d; font-size: 13px; }
+      .good   { fill: #3cb371; font-size: 13px; font-weight: 700; }
+      .bad    { fill: #e5484d; font-size: 13px; }
+      .box    { fill: none; stroke: #30363d; stroke-width: 1; rx: 6; }
+      .cap    { fill: #6e7681; font-size: 12px; font-style: italic; }
+    </style>
+  </defs>
+
+  <!-- window -->
+  <rect class="bg" x="0" y="0" width="860" height="560" rx="10"/>
+  <rect class="titlebar" x="0" y="0" width="860" height="34" rx="10"/>
+  <rect class="titlebar" x="0" y="20" width="860" height="14"/>
+  <circle class="dot-r" cx="22" cy="17" r="6"/>
+  <circle class="dot-y" cx="44" cy="17" r="6"/>
+  <circle class="dot-g" cx="66" cy="17" r="6"/>
+  <text class="tab" x="430" y="22" text-anchor="middle">tokensched — replay</text>
+
+  <!-- command line -->
+  <text x="20" y="62">
+    <tspan class="prompt">$ </tspan><tspan class="cmd">tokensched run examples/overrun-tasktree.yaml </tspan><tspan class="flag">--budget 200k</tspan>
+  </text>
+
+  <!-- headline -->
+  <text class="title" x="20" y="92">Hard-truncation vs scheduled-yield</text>
+  <text class="sub"   x="20" y="110">budget 200k tokens · 6 leaf tasks · naive plan overruns by 87k tokens</text>
+
+  <!-- comparison table -->
+  <rect class="box" x="20" y="124" width="600" height="118"/>
+  <text class="head" x="36" y="146">METRIC</text>
+  <text class="head" x="230" y="146">NAIVE HARD-TRUNCATION</text>
+  <text class="head" x="470" y="146">TOKENSCHED SCHEDULED</text>
+
+  <text class="t"   x="36"  y="170">tokens spent</text>
+  <text class="bad" x="230" y="170">180k</text>
+  <text class="good" x="470" y="170">197.5k</text>
+
+  <text class="t"   x="36"  y="192">tasks completed</text>
+  <text class="bad" x="230" y="192">3 / 6</text>
+  <text class="good" x="470" y="192">6 / 6</text>
+
+  <text class="t"   x="36"  y="214">tasks cut/preempted</text>
+  <text class="bad" x="230" y="214">3</text>
+  <text class="good" x="470" y="214">0</text>
+
+  <text class="t"   x="36"  y="236">realised value</text>
+  <text class="bad" x="230" y="236">240.0</text>
+  <text class="good" x="470" y="236">258.5</text>
+
+  <!-- summary line -->
+  <text class="good" x="20" y="266">&#10003; scheduled-yield saved 3 more task(s) and +18.5 realised value within the same 200k-token budget</text>
+
+  <!-- allocation decisions -->
+  <text class="head" x="20" y="296">Allocation decisions</text>
+  <rect class="box" x="20" y="306" width="820" height="190"/>
+
+  <text class="head" x="36"  y="328">TASK</text>
+  <text class="head" x="276" y="328">ACTION</text>
+  <text class="head" x="390" y="328">TIER</text>
+  <text class="head" x="470" y="328">BUDGET</text>
+  <text class="head" x="560" y="328">VALUE</text>
+
+  <!-- kept on opus -->
+  <text class="keep" x="36"  y="352">design-oauth-flow</text>
+  <text class="keep" x="276" y="352">keep</text>
+  <text class="keep" x="390" y="352">opus</text>
+  <text class="keep" x="470" y="352">70k</text>
+  <text class="keep" x="560" y="352">95.0</text>
+
+  <text class="keep" x="36"  y="374">implement-token-exchange</text>
+  <text class="keep" x="276" y="374">keep</text>
+  <text class="keep" x="390" y="374">opus</text>
+  <text class="keep" x="470" y="374">60k</text>
+  <text class="keep" x="560" y="374">90.0</text>
+
+  <text class="keep" x="36"  y="396">write-integration-tests</text>
+  <text class="keep" x="276" y="396">keep</text>
+  <text class="keep" x="390" y="396">opus</text>
+  <text class="keep" x="470" y="396">50k</text>
+  <text class="keep" x="560" y="396">55.0</text>
+
+  <!-- down-tiered to haiku -->
+  <text class="down" x="36"  y="420">refactor-config-loader</text>
+  <text class="down" x="276" y="420">down-tier</text>
+  <text class="down" x="390" y="420">haiku</text>
+  <text class="down" x="470" y="420">7k</text>
+  <text class="down" x="560" y="420">13.5</text>
+
+  <text class="down" x="36"  y="442">update-changelog</text>
+  <text class="down" x="276" y="442">down-tier</text>
+  <text class="down" x="390" y="442">haiku</text>
+  <text class="down" x="470" y="442">5k</text>
+  <text class="down" x="560" y="442">3.6</text>
+
+  <text class="down" x="36"  y="464">tidy-import-ordering</text>
+  <text class="down" x="276" y="464">down-tier</text>
+  <text class="down" x="390" y="464">haiku</text>
+  <text class="down" x="470" y="464">5500</text>
+  <text class="down" x="560" y="464">1.4</text>
+
+  <text class="sub" x="36" y="486">3 kept on Opus · 3 down-tiered to Haiku · 0 preempted · 197.5k / 200k budget</text>
+
+  <!-- caption -->
+  <text class="cap" x="20" y="524">tokensched run replays an over-budget task tree: low-value nodes down-tiered to Haiku,</text>
+  <text class="cap" x="20" y="542">high-value nodes kept on Opus, window not blown.</text>
+</svg>

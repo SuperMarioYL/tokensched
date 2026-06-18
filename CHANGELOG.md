@@ -1,0 +1,31 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2026-06-18
+
+### Added
+
+- **m1 — task-tree model & `plan`.** Parse a YAML task tree (sub-tasks with a
+  declared `value`, per-tier `est_tokens`, and eligible `tiers`) into an
+  in-memory `*tasktree.Task` tree, with validation (value ≥ 0, non-empty tiers,
+  unique ids). `tokensched plan <tree.yaml>` prints the tree with each leaf's
+  initial top-tier budget and the naive all-top-tier demand vs the budget.
+- **m2 — allocate, preempt & `run`.** A greedy `budget.Allocator` distributes a
+  fixed token budget by descending value-per-token and predicts overrun; the
+  `schedule` package resolves overrun by down-tiering the lowest-marginal-value
+  task (Opus → Sonnet → Haiku) and preempting only when a task is not
+  down-tierable. `tokensched run <tree.yaml> --budget <N>` replays naive
+  hard-truncation against the scheduled run and prints the
+  "hard-truncation vs scheduled-yield" comparison.
+- **m3 — report & importable allocator API.** A lipgloss terminal report renders
+  the per-task decisions (keep / down-tier / preempt + reason + allocated tokens)
+  and the before/after comparison table. The `budget` package exposes a stable,
+  importable API — the `Allocator` interface, the `PreemptionHook`, and the
+  `tier` cost/capability coefficients — so the allocator can be vendored into an
+  agent harness.
+
+[0.1.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.1.0
