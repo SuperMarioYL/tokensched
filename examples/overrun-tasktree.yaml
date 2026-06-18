@@ -1,0 +1,61 @@
+# A realistic Claude Code session task tree that deliberately overruns a
+# 200k-token budget. Each leaf declares:
+#   value      relative importance (>= 0; higher = keep on a stronger model)
+#   est_tokens estimated tokens, quoted per eligible tier (opus baseline)
+#   tiers      model tiers this sub-task may run on (opus/sonnet/haiku)
+#
+# Naive all-opus demand is ~360k tokens — well over the 200k window. Run:
+#   tokensched plan examples/overrun-tasktree.yaml --budget 200k
+#   tokensched run  examples/overrun-tasktree.yaml --budget 200k
+root:
+  id: ship-auth-feature
+  value: 0          # interior node: organisational, no direct cost
+  tiers: [opus, sonnet, haiku]
+  est_tokens: 0
+  children:
+    - id: design-oauth-flow
+      value: 95             # core architectural work — keep on Opus
+      tiers: [opus, sonnet, haiku]
+      est_tokens:
+        opus: 70000
+        sonnet: 28000
+        haiku: 9000
+
+    - id: implement-token-exchange
+      value: 90             # critical implementation — keep on Opus
+      tiers: [opus, sonnet, haiku]
+      est_tokens:
+        opus: 60000
+        sonnet: 24000
+        haiku: 8000
+
+    - id: write-integration-tests
+      value: 55             # important, tolerates Sonnet
+      tiers: [opus, sonnet, haiku]
+      est_tokens:
+        opus: 50000
+        sonnet: 20000
+        haiku: 6500
+
+    - id: refactor-config-loader
+      value: 30             # nice-to-have cleanup, fine on a cheaper tier
+      tiers: [sonnet, haiku]
+      est_tokens:
+        sonnet: 22000
+        haiku: 7000
+
+    - id: update-changelog
+      value: 8              # low value — down-tier to Haiku
+      tiers: [opus, sonnet, haiku]
+      est_tokens:
+        opus: 40000
+        sonnet: 16000
+        haiku: 5000
+
+    - id: tidy-import-ordering
+      value: 3              # lowest value — preempt before blowing the window
+      tiers: [opus, sonnet, haiku]
+      est_tokens:
+        opus: 45000
+        sonnet: 18000
+        haiku: 5500

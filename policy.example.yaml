@@ -1,0 +1,38 @@
+# Example scheduling policy for TokenSched.
+#
+# v0.1 reads the budget from the --budget flag; this file documents the policy
+# knobs the allocator and scheduler honour, and the tier cost/capability
+# coefficients used to reason about down-tiering. It is a reference for how the
+# importable budget/schedule packages behave — see README for the Go API.
+
+# Default token budget if --budget is omitted (the CLI still requires --budget
+# for `run`; this is the policy default a harness embedding the package may use).
+budget: 200000
+
+# Strategy controls how the fixed budget is distributed.
+#   value-per-token  greedy admission by realised-value / estimated-tokens (default)
+strategy: value-per-token
+
+# Preemption policy. When the budget cannot cover every sub-task, the scheduler
+# relaxes the lowest-marginal-value task first.
+preemption:
+  # Down-tier (Opus -> Sonnet -> Haiku) before preempting. Preempt a task only
+  # when it is already on its cheapest eligible tier (not down-tierable).
+  prefer_downtier: true
+  # Optional hard floor: preempt any sub-task whose declared value is strictly
+  # below this threshold regardless of budget headroom. 0 disables the floor.
+  preempt_below_value: 0
+
+# Tier coefficients are relative to Opus = 1.0.
+#   cost_mult  scales token spend when a task runs on the tier (cheaper = less)
+#   cap_mult   fraction of declared value realised on the tier
+tiers:
+  opus:
+    cost_mult: 1.00
+    cap_mult: 1.00
+  sonnet:
+    cost_mult: 0.40
+    cap_mult: 0.75
+  haiku:
+    cost_mult: 0.12
+    cap_mult: 0.45
