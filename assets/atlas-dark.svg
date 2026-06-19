@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 360" width="880" height="360"
+     font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif"
+     role="img" aria-label="TokenSched architecture: a task tree enters the allocator, which sorts by value-per-token, predicts overspend, down-tiers and preempts, then assigns each subtask to a model tier — all inside one budget window">
+  <defs>
+    <marker id="ah-d" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5A5A66"/></marker>
+  </defs>
+  <rect x="0" y="0" width="880" height="360" fill="#1D1D1F"/>
+
+  <!-- budget window frame -->
+  <rect x="24" y="28" width="832" height="308" rx="18" fill="none" stroke="#F2B705" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="44" y="50" font-size="13" font-weight="600" fill="#F2C95B">5-hour budget window — fixed token ceiling</text>
+
+  <!-- connectors -->
+  <g stroke="#3A3A44" stroke-width="1.6" fill="none">
+    <line x1="236" y1="196" x2="300" y2="196" marker-end="url(#ah-d)"/>
+    <line x1="612" y1="196" x2="676" y2="196" marker-end="url(#ah-d)"/>
+  </g>
+
+  <!-- Task Tree -->
+  <g>
+    <rect x="48" y="92" width="188" height="208" rx="15" fill="#94A3B8" fill-opacity="0.10" stroke="#94A3B8" stroke-width="1.5"/>
+    <text x="142" y="118" text-anchor="middle" font-size="15" font-weight="600" fill="#CBD5E1">Task Tree</text>
+    <g font-size="11" fill="#CBD5E1">
+      <rect x="66" y="134" width="152" height="44" rx="9" fill="#F2B705" fill-opacity="0.16" stroke="#F2B705" stroke-width="1.2"/>
+      <text x="78" y="152" font-weight="600" fill="#F2C95B">subtask · value 9</text>
+      <text x="78" y="169">est 40k · Opus|Sonnet|Haiku</text>
+      <rect x="66" y="186" width="152" height="44" rx="9" fill="#F2B705" fill-opacity="0.13" stroke="#F2B705" stroke-width="1.2"/>
+      <text x="78" y="204" font-weight="600" fill="#F2C95B">subtask · value 5</text>
+      <text x="78" y="221">est 30k · Sonnet|Haiku</text>
+      <rect x="66" y="238" width="152" height="44" rx="9" fill="#F2B705" fill-opacity="0.10" stroke="#F2B705" stroke-width="1.2"/>
+      <text x="78" y="256" font-weight="600" fill="#F2C95B">subtask · value 2</text>
+      <text x="78" y="273">est 25k · Haiku</text>
+    </g>
+  </g>
+
+  <!-- Allocator -->
+  <g>
+    <rect x="300" y="92" width="312" height="208" rx="15" fill="#F2B705" fill-opacity="0.14" stroke="#F2B705" stroke-width="1.6"/>
+    <text x="456" y="118" text-anchor="middle" font-size="16" font-weight="700" fill="#F2C95B">Allocator — admission control</text>
+    <g font-size="12.5">
+      <rect x="320" y="134" width="272" height="34" rx="9" fill="#000000" fill-opacity="0.25" stroke="#F2B705" stroke-width="1.1"/>
+      <text x="334" y="156" fill="#E7E3D6"><tspan font-weight="700" fill="#F2C95B">1</tspan>  sort by value-per-token</text>
+      <rect x="320" y="174" width="272" height="34" rx="9" fill="#000000" fill-opacity="0.25" stroke="#F2B705" stroke-width="1.1"/>
+      <text x="334" y="196" fill="#E7E3D6"><tspan font-weight="700" fill="#F2C95B">2</tspan>  predict overspend (naive all-Opus)</text>
+      <rect x="320" y="214" width="272" height="34" rx="9" fill="#000000" fill-opacity="0.25" stroke="#F2B705" stroke-width="1.1"/>
+      <text x="334" y="236" fill="#E7E3D6"><tspan font-weight="700" fill="#F2C95B">3</tspan>  down-tier low marginal value</text>
+      <rect x="320" y="254" width="272" height="34" rx="9" fill="#000000" fill-opacity="0.25" stroke="#F2B705" stroke-width="1.1"/>
+      <text x="334" y="276" fill="#E7E3D6"><tspan font-weight="700" fill="#F2C95B">4</tspan>  preempt — last resort only</text>
+    </g>
+  </g>
+
+  <!-- Model Tiers -->
+  <g>
+    <rect x="676" y="92" width="156" height="208" rx="15" fill="#2DC79A" fill-opacity="0.10" stroke="#2DC79A" stroke-width="1.5"/>
+    <text x="754" y="118" text-anchor="middle" font-size="15" font-weight="600" fill="#5BE0BC">Model Tiers</text>
+    <g font-size="12.5" font-weight="600">
+      <rect x="694" y="134" width="120" height="40" rx="9" fill="#2DC79A" fill-opacity="0.22" stroke="#2DC79A" stroke-width="1.2"/>
+      <text x="754" y="159" text-anchor="middle" fill="#5BE0BC">Opus</text>
+      <rect x="694" y="182" width="120" height="40" rx="9" fill="#2DC79A" fill-opacity="0.15" stroke="#2DC79A" stroke-width="1.2"/>
+      <text x="754" y="207" text-anchor="middle" fill="#5BE0BC">Sonnet</text>
+      <rect x="694" y="230" width="120" height="40" rx="9" fill="#2DC79A" fill-opacity="0.09" stroke="#2DC79A" stroke-width="1.2"/>
+      <text x="754" y="255" text-anchor="middle" fill="#5BE0BC">Haiku</text>
+    </g>
+  </g>
+</svg>

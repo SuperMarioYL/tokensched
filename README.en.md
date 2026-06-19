@@ -34,6 +34,18 @@ In one line: **it turns hard truncation into a schedulable soft yield.** When yo
 
 > TokenSched is an **allocator**, not a compressor. It does not touch your payload; it does admission control at the task-tree layer: deciding *which sub-task* deserves tokens, and on *which tier*.
 
+## <img src="https://api.iconify.design/tabler/topology-star-3.svg?color=%23f2b705" width="20" height="20" align="center" /> Architecture
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/atlas-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./assets/atlas-light.svg">
+    <img src="./assets/atlas-light.svg" width="880" alt="A task tree enters the allocator, which sorts by value-per-token, predicts overspend, down-tiers and preempts, then assigns each subtask to a model tier — all inside one budget window">
+  </picture>
+</p>
+
+A task tree (each subtask carrying a value, a token estimate, and allowed tiers) enters the **allocator**, which does admission control the way an OS schedules CPU: ① sort by value-per-token → ② predict how far a naive all-Opus plan overspends → ③ down-tier the lowest-marginal-value subtasks (Opus→Sonnet→Haiku) → ④ preempt only when something already on the cheapest tier still won't fit. Every subtask lands on a **model tier**, and the whole tree runs inside one 5-hour **budget window**.
+
 ## <img src="https://api.iconify.design/tabler/terminal-2.svg?color=%23f2b705" width="20" height="20" align="center" /> Quickstart
 
 Install (a single binary, no network, no daemon):
@@ -74,6 +86,12 @@ tokensched run examples/overrun-tasktree.yaml --budget 200k
 ## <img src="https://api.iconify.design/tabler/photo.svg?color=%23f2b705" width="20" height="20" align="center" /> Demo
 
 The same task tree, doomed to overrun a 200k budget, executed two ways: naive execution hard-truncates 3 sub-tasks (including the most important one) when the window runs out; TokenSched down-tiers the low-value nodes to Haiku, keeps every high-value node on Opus, and finishes all 6 sub-tasks without blowing the budget.
+
+<p align="center">
+  <img src="./assets/demo.gif" alt="tokensched plan + schedule terminal demo" width="820" />
+</p>
+
+<sub>↑ Terminal recording (rendered in CI from <a href="./docs/demo.tape">docs/demo.tape</a> via <a href="https://github.com/charmbracelet/vhs">vhs</a> on tag push). Static before/after comparison below:</sub>
 
 <div align="center">
   <img src="./docs/assets/demo.svg" alt="tokensched run replays an over-budget task tree: low-value nodes down-tiered to Haiku, high-value nodes kept on Opus, window not blown." width="780" />

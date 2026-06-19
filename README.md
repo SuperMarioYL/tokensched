@@ -34,6 +34,18 @@
 
 > TokenSched 是**分配器（allocator）**，不是压缩器（compressor）。它不改你的 payload，而是在任务树层做准入控制（admission control）：决定*哪个子任务*值得花 token，以及该花在*哪个档位*。
 
+## <img src="https://api.iconify.design/tabler/topology-star-3.svg?color=%23f2b705" width="20" height="20" align="center" /> 架构
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/atlas-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./assets/atlas-light.svg">
+    <img src="./assets/atlas-light.svg" width="880" alt="任务树进入分配器，分配器按 value-per-token 排序、预测超支、降档、抢占，再把每个子任务分配到模型档位——全程在一个预算窗口内">
+  </picture>
+</p>
+
+一棵任务树（每个子任务带价值、预估 token、可用档位）进入**分配器**。分配器像 OS 调度 CPU 一样做准入控制：① 按 value-per-token 排序 → ② 预测「全 Opus」会超支多少 → ③ 把边际价值最低的子任务降档（Opus→Sonnet→Haiku）→ ④ 仅当已在最便宜档位仍放不下时才抢占。最终每个子任务落到某个**模型档位**，整棵树跑在 5 小时**预算窗口**内。
+
 ## <img src="https://api.iconify.design/tabler/terminal-2.svg?color=%23f2b705" width="20" height="20" align="center" /> 快速开始
 
 安装（单二进制，零网络、零守护进程）：
@@ -74,6 +86,12 @@ tokensched run examples/overrun-tasktree.yaml --budget 200k
 ## <img src="https://api.iconify.design/tabler/photo.svg?color=%23f2b705" width="20" height="20" align="center" /> Demo
 
 同一棵 200k 预算下注定超支的任务树，两种执行方式的对比：朴素执行在窗口耗尽时硬截断掉 3 个子任务（含最重要的一个）；TokenSched 把低价值节点降级到 Haiku、保住全部高价值节点在 Opus 上，6 个子任务全部跑完且未超预算。
+
+<p align="center">
+  <img src="./assets/demo.gif" alt="tokensched plan + schedule 终端演示" width="820" />
+</p>
+
+<sub>↑ 终端实录（由 CI 用 <a href="https://github.com/charmbracelet/vhs">vhs</a> 渲染 <a href="./docs/demo.tape">docs/demo.tape</a>，打 tag 时自动生成）。下方为前后对比静图：</sub>
 
 <div align="center">
   <img src="./docs/assets/demo.svg" alt="tokensched run replays an over-budget task tree: low-value nodes down-tiered to Haiku, high-value nodes kept on Opus, window not blown." width="780" />
