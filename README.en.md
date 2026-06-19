@@ -83,6 +83,32 @@ tokensched run examples/overrun-tasktree.yaml --budget 200k
 
 `--budget` accepts a plain integer or a `k`/`m` suffix (e.g. `200k`, `1.5m`, `200000`). Copy `examples/overrun-tasktree.yaml` and fill in your own sub-tasks' `value` / `est_tokens` / `tiers` following the comments.
 
+**3. Machine-readable output for a harness (`--json`):**
+
+Both `plan` and `run` accept `--json` to emit a stable, structured document (no ANSI, no table parsing) you can feed straight into your agent orchestrator:
+
+```bash
+tokensched run examples/overrun-tasktree.yaml --budget 200k --json
+```
+
+```json
+{
+  "budget": 200000,
+  "overrun_tokens": 87000,
+  "scheduled": {
+    "spent_tokens": 197500,
+    "value": 258.5,
+    "decisions": [
+      { "task_id": "design-oauth-flow", "action": "keep", "tier": "opus", "budget_tokens": 70000, "value": 95 }
+    ]
+  },
+  "tasks_saved": 3,
+  "value_saved": 18.5
+}
+```
+
+A preempted sub-task serialises with an empty `tier`. `plan --json` instead emits each leaf's `value` / `tiers` / `top_tier` / `init_tokens`, plus the naive demand and overrun.
+
 ## <img src="https://api.iconify.design/tabler/photo.svg?color=%23f2b705" width="20" height="20" align="center" /> Demo
 
 The same task tree, doomed to overrun a 200k budget, executed two ways: naive execution hard-truncates 3 sub-tasks (including the most important one) when the window runs out; TokenSched down-tiers the low-value nodes to Haiku, keeps every high-value node on Opus, and finishes all 6 sub-tasks without blowing the budget.
@@ -146,8 +172,8 @@ The `budget.Allocator` interface, the `budget.PreemptionHook`, and the `tier` co
 | Version | Status | Scope |
 | --- | --- | --- |
 | **v0.1.0** | ✅ Released | `plan` parses a task tree and allocates initial budgets; `run` replays naive hard-truncation vs scheduled-yield; greedy value-per-token allocation + down-tier/preempt; importable allocator / preemption-hook API; lipgloss terminal report. |
-| v0.2 | Planned | Real token schema + live metering; a resident daemon that watches the real 5-hour window. |
-| v0.3 | Exploring | A learned model to auto-estimate sub-task value; a multi-agent shared budget pool. |
+| **v0.2.0** | ✅ Released | `--json` machine-readable output for `plan` / `run`, so the scheduler drops straight into an agent harness; fixed a value-per-token ordering bug that ranked zero-cost (free-value) sub-tasks last instead of first. |
+| v0.3 | Planned | Real token schema + live metering; a resident daemon that watches the real 5-hour window; a learned model to auto-estimate sub-task value; a multi-agent shared budget pool. |
 
 **Explicitly out of scope for v0.1**: an inline gateway intercepting real Claude Code / Anthropic API traffic · learned auto-valuation · web UI / dashboard · multi-user shared budget pool · auth / accounts / cloud hosting / paid tiers · token compression / payload shrinking (that's a compressor's job — TokenSched is an allocator).
 

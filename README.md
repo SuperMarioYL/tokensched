@@ -83,6 +83,32 @@ tokensched run examples/overrun-tasktree.yaml --budget 200k
 
 `--budget` 接受纯整数或 `k`/`m` 后缀（如 `200k`、`1.5m`、`200000`）。把 `examples/overrun-tasktree.yaml` 复制一份，按注释填上你自己子任务的 `value` / `est_tokens` / `tiers` 即可。
 
+**3. 给 harness 用的机器可读输出（`--json`）：**
+
+`plan` 与 `run` 都支持 `--json`，输出稳定的结构化文档（无 ANSI、无需解析表格），方便直接喂给你的 Agent 编排框架：
+
+```bash
+tokensched run examples/overrun-tasktree.yaml --budget 200k --json
+```
+
+```json
+{
+  "budget": 200000,
+  "overrun_tokens": 87000,
+  "scheduled": {
+    "spent_tokens": 197500,
+    "value": 258.5,
+    "decisions": [
+      { "task_id": "design-oauth-flow", "action": "keep", "tier": "opus", "budget_tokens": 70000, "value": 95 }
+    ]
+  },
+  "tasks_saved": 3,
+  "value_saved": 18.5
+}
+```
+
+被抢占（preempt）的子任务序列化时 `tier` 为空字符串。`plan --json` 则输出每个叶子的 `value` / `tiers` / `top_tier` / `init_tokens`，以及朴素需求与超支量。
+
 ## <img src="https://api.iconify.design/tabler/photo.svg?color=%23f2b705" width="20" height="20" align="center" /> Demo
 
 同一棵 200k 预算下注定超支的任务树，两种执行方式的对比：朴素执行在窗口耗尽时硬截断掉 3 个子任务（含最重要的一个）；TokenSched 把低价值节点降级到 Haiku、保住全部高价值节点在 Opus 上，6 个子任务全部跑完且未超预算。
@@ -146,8 +172,8 @@ _ = plan
 | 版本 | 状态 | 内容 |
 | --- | --- | --- |
 | **v0.1.0** | ✅ 已发布 | `plan` 解析任务树并分配初始预算；`run` 回放朴素硬截断 vs 调度退让；按 value-per-token 贪心分配 + 降级/抢占；可 `import` 的分配器 / 抢占钩子 API；lipgloss 终端报告。 |
-| v0.2 | 计划中 | 接入真实 token schema 与活计量；常驻 daemon 观察真实 5 小时窗口。 |
-| v0.3 | 探索中 | 用学习模型自动估计子任务价值；多 agent 共享预算池。 |
+| **v0.2.0** | ✅ 已发布 | `plan` / `run` 新增 `--json` 机器可读输出，便于直接接入 Agent harness；修复零成本子任务（免费价值）被错排到最后的 value-per-token 排序 bug。 |
+| v0.3 | 计划中 | 接入真实 token schema 与活计量；常驻 daemon 观察真实 5 小时窗口；用学习模型自动估计子任务价值；多 agent 共享预算池。 |
 
 **v0.1 明确不做**：拦截真实 Claude Code / Anthropic API 流量的 inline 网关 · 学习模型自动估值 · Web UI / dashboard · 多用户共享预算池 · 账号 / 云托管 / 收费档位 · token 压缩 / payload 减量（那是压缩器的活，TokenSched 是分配器）。
 

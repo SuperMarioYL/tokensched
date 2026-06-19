@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-19
+
+### Added
+
+- **`--json` output for `plan` and `run`.** Both commands now accept `--json` to
+  emit a stable, machine-readable document instead of the lipgloss terminal
+  report — `plan --json` carries every leaf (value, tiers, top tier, initial
+  tokens) plus the naive demand and overrun; `run --json` carries both
+  strategies' per-task decisions and the headline value/tasks saved. This makes
+  the scheduler directly consumable from an agent harness (no ANSI, no table
+  parsing); a preempted task serialises with an empty `tier`.
+
+### Fixed
+
+- **Zero-cost tasks are no longer mis-ranked.** A sub-task whose top-tier
+  estimate is `0` is free realised value (unbounded value-per-token), but the
+  greedy allocator was assigning it a value-per-token of `0` — ranking it *last*
+  instead of *first*. Such tasks now sort ahead of every finite-cost task, so
+  free value is admitted first and is never the first thing cut.
+
 ## [0.1.1] - 2026-06-19
 
 ### Added
@@ -42,4 +62,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tier` cost/capability coefficients — so the allocator can be vendored into an
   agent harness.
 
+[0.2.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.1.0
