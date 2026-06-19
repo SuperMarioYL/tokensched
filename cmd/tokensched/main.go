@@ -20,7 +20,7 @@ import (
 
 // version is overridable at build time with
 // -ldflags "-X main.version=vX.Y.Z".
-var version = "v0.1.0-dev"
+var version = "v0.2.0-dev"
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
@@ -43,6 +43,7 @@ func newRootCmd() *cobra.Command {
 
 func newPlanCmd() *cobra.Command {
 	var budgetStr string
+	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "plan <tree.yaml>",
 		Short: "Parse a task tree and print it with each node's initial budget",
@@ -59,16 +60,26 @@ func newPlanCmd() *cobra.Command {
 					return err
 				}
 			}
+			if asJSON {
+				out, err := report.TreeJSON(root, budgetTokens)
+				if err != nil {
+					return err
+				}
+				fmt.Fprint(cmd.OutOrStdout(), out)
+				return nil
+			}
 			fmt.Fprint(cmd.OutOrStdout(), report.Tree(root, budgetTokens))
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&budgetStr, "budget", "", "optional token budget to compare against (e.g. 200k)")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "emit machine-readable JSON instead of the terminal report")
 	return cmd
 }
 
 func newRunCmd() *cobra.Command {
 	var budgetStr string
+	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "run <tree.yaml> --budget <N>",
 		Short: "Replay naive hard-truncation vs scheduled execution under a budget",
@@ -89,11 +100,20 @@ func newRunCmd() *cobra.Command {
 				return fmt.Errorf("--budget must be positive")
 			}
 			cmp := sim.Replay(root, budgetTokens, nil)
+			if asJSON {
+				out, err := report.FullJSON(cmp)
+				if err != nil {
+					return err
+				}
+				fmt.Fprint(cmd.OutOrStdout(), out)
+				return nil
+			}
 			fmt.Fprint(cmd.OutOrStdout(), report.Full(cmp))
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&budgetStr, "budget", "", "token budget for the run (e.g. 200k, 1.5m, 200000)")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "emit machine-readable JSON instead of the terminal report")
 	return cmd
 }
 
