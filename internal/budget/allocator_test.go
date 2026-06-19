@@ -134,6 +134,39 @@ func TestPredictOverrun(t *testing.T) {
 	}
 }
 
+// TestZeroCostFreeValueRankedFirst: a zero-token task with positive value is
+// free realised value (unbounded value-per-token) and must be admitted ahead of
+// every finite-cost task — never ranked last and never the first thing cut.
+func TestZeroCostFreeValueRankedFirst(t *testing.T) {
+	root := tree(
+		leaf("free", 90, allTiers(), map[tier.Tier]int{tier.Opus: 0, tier.Sonnet: 0, tier.Haiku: 0}),
+		leaf("paid", 100, allTiers(), map[tier.Tier]int{tier.Opus: 10_000, tier.Sonnet: 4_000, tier.Haiku: 1_200}),
+	)
+	ds := NewGreedyAllocator(nil).Allocate(root, 1_000_000)
+	// Decisions come back in descending value-per-token order; the free task has
+	// infinite v/tok, so it must be first.
+	if ds[0].TaskID != "free" {
+		t.Fatalf("zero-cost free-value task should rank first (infinite v/tok), got %q first", ds[0].TaskID)
+	}
+	if d := decisionFor(ds, "free"); d.Action != Keep {
+		t.Fatalf("zero-cost free-value task should be kept, got %s", d.Action)
+	}
+}
+
+// TestZeroCostFreeValueNotStarved: under a budget so tight only one paid task
+// fits, the free-value task is still admitted (it costs nothing) rather than
+// being starved by its mis-ranked value-per-token.
+func TestZeroCostFreeValueNotStarved(t *testing.T) {
+	root := tree(
+		leaf("paid_low", 5, allTiers(), map[tier.Tier]int{tier.Opus: 80_000, tier.Sonnet: 32_000, tier.Haiku: 9_600}),
+		leaf("free", 70, allTiers(), map[tier.Tier]int{tier.Opus: 0, tier.Sonnet: 0, tier.Haiku: 0}),
+	)
+	ds := NewGreedyAllocator(nil).Allocate(root, 80_000)
+	if d := decisionFor(ds, "free"); d.Action == Preempt {
+		t.Fatalf("zero-cost free-value task must never be preempted, got %s", d.Action)
+	}
+}
+
 // TestPreemptionHook: a hook that forces preempt overrides admission.
 func TestPreemptionHook(t *testing.T) {
 	root := tree(

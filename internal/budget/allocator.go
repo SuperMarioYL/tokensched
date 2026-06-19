@@ -11,6 +11,7 @@ package budget
 
 import (
 	"fmt"
+	"math"
 	"sort"
 
 	"github.com/SuperMarioYL/tokensched/internal/tasktree"
@@ -109,6 +110,14 @@ func (a *GreedyAllocator) Allocate(root *tasktree.Task, budget int) []Decision {
 		var vpt float64
 		if est > 0 {
 			vpt = t.ValueAt(top) / float64(est)
+		} else {
+			// A zero- (or non-positive) cost task is free realised value: its
+			// value-per-token is unbounded, so it must rank ahead of every
+			// finite-cost task (free value is never the first thing cut). A
+			// zero-value, zero-cost task stays at the bottom on the tie-break.
+			if t.ValueAt(top) > 0 {
+				vpt = math.Inf(1)
+			}
 		}
 		cands = append(cands, candidate{task: t, vpt: vpt})
 	}
