@@ -17,20 +17,23 @@ jobs:
         with:
           go-version: "1.24"
       - name: Build binary for the demo
-        run: go build -o tokensched ./cmd/tokensched
-      - name: Install ffmpeg + ttyd (vhs deps)
+        run: go build -o /usr/local/bin/tokensched ./cmd/tokensched
+      - name: Install vhs + deps (ffmpeg, ttyd, vhs)
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y ffmpeg ttyd
+          sudo apt-get install -y ffmpeg
+          sudo curl -fsSL -o /usr/local/bin/ttyd https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64
+          sudo chmod +x /usr/local/bin/ttyd
+          go install github.com/charmbracelet/vhs@latest
       - name: Render demo.gif
-        uses: charmbracelet/vhs-action@v2
-        with:
-          path: docs/demo.tape
-          install-fonts: true
+        run: |
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          vhs docs/demo.tape
       - name: Commit rendered gif
         run: |
           git config user.name  "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
           git add assets/demo.gif
-          git commit -m "chore: render demo gif" || echo "no change"
-          git push || echo "nothing to push"
+          git commit -m "chore: render demo gif" || { echo "no change"; exit 0; }
+          git push
