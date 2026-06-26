@@ -136,6 +136,76 @@ func TestPreemptOnlyWhenNotDownTierable(t *testing.T) {
 	}
 }
 
+// TestRelaxSpreadsAcrossFrontier (v0.3.0 regression): two relax steps must fall
+// on two DIFFERENT tasks. Before the fix, lowestMarginalRunning ranked by raw
+// realised Value, which relax() lowers on down-tier, so the same just-down-tiered
+// task was re-selected and marched to the floor while sibling low-value tasks
+// were never touched. Ranking by value density (stable under down-tiering) +
+// preferring down-tierable victims spreads relaxation across the frontier.
+func TestRelaxSpreadsAcrossFrontier(t *testing.T) {
+	// Three close-value, down-tierable running tasks. We hand the relax loop a
+	// decision set + task map directly and run two relaxation steps, asserting
+	// the two victims are distinct.
+	tasks := map[string]*tasktree.Task{
+		"x": leaf("x", 31, opusSonnetHaiku(30_000, 12_000, 3_600)),
+		"y": leaf("y", 30, opusSonnetHaiku(30_000, 12_000, 3_600)),
+		"z": leaf("z", 29, opusSonnetHaiku(30_000, 12_000, 3_600)),
+	}
+	dec := func(id string) budget.Decision {
+		t := tasks[id]
+		return budget.Decision{
+			TaskID: id, Action: budget.Keep, Tier: tier.Opus,
+			Budget: t.EstAt(tier.Opus), Value: t.ValueAt(tier.Opus),
+		}
+	}
+	decisions := []budget.Decision{dec("x"), dec("y"), dec("z")}
+
+	v1 := lowestMarginalRunning(decisions, tasks)
+	if v1 == nil {
+		t.Fatal("step 1: no victim selected")
+	}
+	// Relax the first victim in place (down-tier one step).
+	for i := range decisions {
+		if decisions[i].TaskID == v1.TaskID {
+			relax(&decisions[i], tasks[v1.TaskID], nil, 1_000_000)
+		}
+	}
+	v2 := lowestMarginalRunning(decisions, tasks)
+	if v2 == nil {
+		t.Fatal("step 2: no victim selected")
+	}
+	if v1.TaskID == v2.TaskID {
+		t.Fatalf("relaxation re-selected the same task %q for both steps; "+
+			"expected the two steps to fall on different tasks", v1.TaskID)
+	}
+}
+
+// TestRelaxPrefersDownTierableVictim: when one running task is already on its
+// cheapest eligible tier (only preempt left) and another is still down-tierable,
+// the down-tierable one is relaxed first — shaving a tier frees tokens without
+// losing a task entirely.
+func TestRelaxPrefersDownTierableVictim(t *testing.T) {
+	floored := &tasktree.Task{
+		ID: "floored", Value: 8,
+		Tiers:     []tier.Tier{tier.Haiku}, // not down-tierable
+		EstTokens: map[tier.Tier]int{tier.Haiku: 5_000},
+	}
+	roomy := leaf("roomy", 9, opusSonnetHaiku(30_000, 12_000, 3_600)) // down-tierable
+	tasks := map[string]*tasktree.Task{"floored": floored, "roomy": roomy}
+	decisions := []budget.Decision{
+		{TaskID: "floored", Action: budget.Keep, Tier: tier.Haiku, Budget: 5_000, Value: floored.ValueAt(tier.Haiku)},
+		{TaskID: "roomy", Action: budget.Keep, Tier: tier.Opus, Budget: 30_000, Value: roomy.ValueAt(tier.Opus)},
+	}
+	v := lowestMarginalRunning(decisions, tasks)
+	if v == nil || v.TaskID != "roomy" {
+		got := "<nil>"
+		if v != nil {
+			got = v.TaskID
+		}
+		t.Fatalf("expected down-tierable 'roomy' to be relaxed first, got %s", got)
+	}
+}
+
 // TestSchedulerPreemptHook: a value-threshold hook preempts low-value tasks.
 func TestSchedulerPreemptHook(t *testing.T) {
 	root := tree(

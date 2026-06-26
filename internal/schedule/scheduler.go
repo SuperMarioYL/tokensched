@@ -6,10 +6,12 @@
 package schedule
 
 import (
+	"math"
 	"sort"
 
 	"github.com/SuperMarioYL/tokensched/internal/budget"
 	"github.com/SuperMarioYL/tokensched/internal/tasktree"
+	"github.com/SuperMarioYL/tokensched/internal/tier"
 )
 
 // Plan is the scheduler's output: a budget-conserving set of decisions plus
@@ -104,18 +106,63 @@ func totalExcluding(ds []budget.Decision, id string) int {
 	return sum
 }
 
-// lowestMarginalRunning returns the still-running (non-preempted) decision with
-// the lowest marginal value (realised value at its current tier). Ties broken
-// by id for determinism.
-func lowestMarginalRunning(ds []budget.Decision, _ map[string]*tasktree.Task) *budget.Decision {
+// lowestMarginalRunning returns the still-running (non-preempted) decision to
+// relax next. It ranks by value DENSITY (realised value per allocated token),
+// not raw realised value, and excludes tasks already on their cheapest eligible
+// tier whenever a down-tierable task is still available.
+//
+// Why density, and why the exclusion: relax() lowers a victim's realised Value
+// when it down-tiers it (Value = declared * tier.CapMult, which drops
+// Opus->Sonnet->Haiku). Ranking by raw Value therefore re-selects the SAME
+// just-down-tiered task next iteration and marches one branch to the floor
+// before any other low-value task is touched — over-degrading a single branch.
+// Density is stable under down-tiering (both Value and Budget shrink together),
+// so a relaxed task is no longer automatically the next victim, and relaxation
+// spreads across the lowest-value frontier. Ties broken by id for determinism.
+func lowestMarginalRunning(ds []budget.Decision, byTask map[string]*tasktree.Task) *budget.Decision {
+	density := func(d *budget.Decision) float64 {
+		if d.Budget <= 0 {
+			// A zero-cost running task is free realised value: never the first
+			// to cut, so give it +Inf density (sorts last as a victim).
+			return math.Inf(1)
+		}
+		return d.Value / float64(d.Budget)
+	}
+	// downTierable reports whether the task can still be down-tiered (so relax
+	// would lower its commitment without preempting it).
+	downTierable := func(d *budget.Decision) bool {
+		t := byTask[d.TaskID]
+		if t == nil {
+			return false
+		}
+		_, ok := tier.Lower(d.Tier, t.Tiers)
+		return ok
+	}
+
 	var best *budget.Decision
+	var bestHasHeadroom bool
 	for i := range ds {
 		d := &ds[i]
 		if d.Action == budget.Preempt {
 			continue
 		}
-		if best == nil || d.Value < best.Value || (d.Value == best.Value && d.TaskID < best.TaskID) {
-			best = d
+		hasHeadroom := downTierable(d)
+		switch {
+		case best == nil:
+			best, bestHasHeadroom = d, hasHeadroom
+		case hasHeadroom != bestHasHeadroom:
+			// Prefer a down-tierable victim over a not-down-tierable one: shaving
+			// a tier frees tokens without losing the task entirely, so a
+			// down-tierable task should be relaxed before we preempt a floored one.
+			if hasHeadroom {
+				best, bestHasHeadroom = d, hasHeadroom
+			}
+		default:
+			// Same head-room class: pick the lower value density; ties by id.
+			di, db := density(d), density(best)
+			if di < db || (di == db && d.TaskID < best.TaskID) {
+				best, bestHasHeadroom = d, hasHeadroom
+			}
 		}
 	}
 	return best
