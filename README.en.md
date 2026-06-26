@@ -109,6 +109,32 @@ tokensched run examples/overrun-tasktree.yaml --budget 200k --json
 
 A preempted sub-task serialises with an empty `tier`. `plan --json` instead emits each leaf's `value` / `tiers` / `top_tier` / `init_tokens`, plus the naive demand and overrun.
 
+**4. Pluggable preemption policy (`--policy`):**
+
+`run` can take a policy file that injects admission/preemption behaviour into the schedule. The most useful knob is `preempt_below_value`: preempt every sub-task whose declared value is below the threshold, regardless of remaining budget headroom.
+
+```bash
+tokensched run examples/overrun-tasktree.yaml --budget 200k --policy policy.example.yaml
+```
+
+The file's `preemption` block (see `policy.example.yaml`):
+
+```yaml
+preemption:
+  prefer_downtier: true       # down-tier (Opus→Sonnet→Haiku) before preempting
+  preempt_below_value: 20     # preempt any sub-task with value < 20; 0 disables the floor (== no --policy)
+```
+
+`run --json` carries the effective policy so a harness can confirm which policy ran:
+
+```json
+{
+  "policy": { "source": "policy.example.yaml", "preempt_below_value": 20, "prefer_downtier": true, "active": true }
+}
+```
+
+Without `--policy` (or with `preempt_below_value: 0`) it is a no-op, identical to the previous behaviour.
+
 ## <img src="https://api.iconify.design/tabler/photo.svg?color=%23f2b705" width="20" height="20" align="center" /> Demo
 
 The same task tree, doomed to overrun a 200k budget, executed two ways: naive execution hard-truncates 3 sub-tasks (including the most important one) when the window runs out; TokenSched down-tiers the low-value nodes to Haiku, keeps every high-value node on Opus, and finishes all 6 sub-tasks without blowing the budget.
@@ -173,7 +199,8 @@ The `budget.Allocator` interface, the `budget.PreemptionHook`, and the `tier` co
 | --- | --- | --- |
 | **v0.1.0** | ✅ Released | `plan` parses a task tree and allocates initial budgets; `run` replays naive hard-truncation vs scheduled-yield; greedy value-per-token allocation + down-tier/preempt; importable allocator / preemption-hook API; lipgloss terminal report. |
 | **v0.2.0** | ✅ Released | `--json` machine-readable output for `plan` / `run`, so the scheduler drops straight into an agent harness; fixed a value-per-token ordering bug that ranked zero-cost (free-value) sub-tasks last instead of first. |
-| v0.3 | Planned | Real token schema + live metering; a resident daemon that watches the real 5-hour window; a learned model to auto-estimate sub-task value; a multi-agent shared budget pool. |
+| **v0.3.0** | ✅ Released | `run --policy <file>` wires the pluggable preemption policy through from the CLI (`preempt_below_value` / `prefer_downtier`), and `run --json` reports the effective policy; fixed an overrun-relaxation bug that marched one branch to the floor instead of spreading across the lowest-value frontier. |
+| v0.4 | Planned | Real token schema + live metering; a resident daemon that watches the real 5-hour window; a learned model to auto-estimate sub-task value; a multi-agent shared budget pool. |
 
 **Explicitly out of scope for v0.1**: an inline gateway intercepting real Claude Code / Anthropic API traffic · learned auto-valuation · web UI / dashboard · multi-user shared budget pool · auth / accounts / cloud hosting / paid tiers · token compression / payload shrinking (that's a compressor's job — TokenSched is an allocator).
 

@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/SuperMarioYL/tokensched/internal/policy"
 	"github.com/SuperMarioYL/tokensched/internal/report"
 	"github.com/SuperMarioYL/tokensched/internal/sim"
 	"github.com/SuperMarioYL/tokensched/internal/tasktree"
@@ -20,7 +21,7 @@ import (
 
 // version is overridable at build time with
 // -ldflags "-X main.version=vX.Y.Z".
-var version = "v0.2.0-dev"
+var version = "v0.3.0-dev"
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
@@ -80,6 +81,7 @@ func newPlanCmd() *cobra.Command {
 func newRunCmd() *cobra.Command {
 	var budgetStr string
 	var asJSON bool
+	var policyPath string
 	cmd := &cobra.Command{
 		Use:   "run <tree.yaml> --budget <N>",
 		Short: "Replay naive hard-truncation vs scheduled execution under a budget",
@@ -99,9 +101,23 @@ func newRunCmd() *cobra.Command {
 			if budgetTokens <= 0 {
 				return fmt.Errorf("--budget must be positive")
 			}
-			cmp := sim.Replay(root, budgetTokens, nil)
+			// Load the pluggable preemption policy. With no --policy this is the
+			// no-op default (nil hook) == the pre-v0.3.0 behaviour.
+			pol := policy.Default()
+			if strings.TrimSpace(policyPath) != "" {
+				pol, err = policy.LoadFile(policyPath)
+				if err != nil {
+					return err
+				}
+			}
+			cmp := sim.Replay(root, budgetTokens, pol.Hook())
 			if asJSON {
-				out, err := report.FullJSON(cmp)
+				out, err := report.FullJSONWithPolicy(cmp, report.EffectivePolicy{
+					Source:            policyOrDefault(policyPath),
+					PreemptBelowValue: pol.PreemptBelowValue,
+					PreferDownTier:    pol.PreferDownTier,
+					Active:            pol.Active(),
+				})
 				if err != nil {
 					return err
 				}
@@ -114,7 +130,17 @@ func newRunCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&budgetStr, "budget", "", "token budget for the run (e.g. 200k, 1.5m, 200000)")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit machine-readable JSON instead of the terminal report")
+	cmd.Flags().StringVar(&policyPath, "policy", "", "path to a scheduling policy file (preemption block; e.g. policy.example.yaml)")
 	return cmd
+}
+
+// policyOrDefault reports the policy source for the --json document: the file
+// path when --policy was given, else "default".
+func policyOrDefault(path string) string {
+	if strings.TrimSpace(path) == "" {
+		return "default"
+	}
+	return path
 }
 
 func newVersionCmd() *cobra.Command {

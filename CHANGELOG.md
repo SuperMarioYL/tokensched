@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-27
+
+### Added
+
+- **`run --policy <file>` — the pluggable preemption policy is now reachable.**
+  A new `internal/policy` package parses the `preemption` block of a policy file
+  (`preempt_below_value`, `prefer_downtier`) into a preemption hook and forwards
+  it to the scheduler. Before this release the knobs were documented in
+  `policy.example.yaml` and existed in code (`schedule.PreemptBelow`, the
+  `PreemptionHook` type), but the CLI always passed a `nil` hook, so the
+  project's pluggable-policy primitive was unreachable from the binary.
+  `run --budget 100k --policy policy.example.yaml` now applies the file's
+  preemption policy; a positive `preempt_below_value` preempts every sub-task
+  whose declared value is below the threshold, and a `0`/absent threshold is a
+  no-op identical to a run with no `--policy`.
+- **Effective policy in `run --json`.** The `run --json` document now carries a
+  `policy` object (`source`, `preempt_below_value`, `prefer_downtier`, `active`)
+  so a calling harness can confirm exactly which preemption policy was applied.
+
+### Fixed
+
+- **Overrun relaxation no longer over-degrades a single branch.** When the
+  scheduler had to relax tasks to fit a budget, it ranked victims by raw
+  realised value — but relaxing (down-tiering) a task lowers its realised value,
+  so the same just-relaxed task was re-selected and marched all the way to the
+  floor before any sibling low-value task was touched. Victim selection now
+  ranks by value *density* (realised value per allocated token, stable under
+  down-tiering) and prefers a still-down-tierable task over an already-floored
+  one, so relaxation spreads evenly across the lowest-value frontier.
+
 ## [0.2.0] - 2026-06-19
 
 ### Added
@@ -62,5 +92,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tier` cost/capability coefficients — so the allocator can be vendored into an
   agent harness.
 
+[0.3.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.1.0

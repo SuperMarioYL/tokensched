@@ -53,15 +53,29 @@ type jsonOutcome struct {
 	Decisions []jsonDecision `json:"decisions"`
 }
 
-// jsonRun is the `run --json` document.
+// EffectivePolicy is the preemption policy that was actually applied to a run,
+// surfaced in `run --json` so a calling harness can confirm which policy ran
+// (v0.3.0). Source is the policy file path, or "default" when no --policy was
+// given. Active reports whether the policy changed scheduling vs the no-policy
+// default.
+type EffectivePolicy struct {
+	Source            string  `json:"source"`
+	PreemptBelowValue float64 `json:"preempt_below_value"`
+	PreferDownTier    bool    `json:"prefer_downtier"`
+	Active            bool    `json:"active"`
+}
+
+// jsonRun is the `run --json` document. Policy is omitted by the legacy FullJSON
+// path (nil) and populated by FullJSONWithPolicy.
 type jsonRun struct {
-	Budget     int         `json:"budget"`
-	LeafCount  int         `json:"leaf_count"`
-	Overrun    int         `json:"overrun_tokens"`
-	Naive      jsonOutcome `json:"naive"`
-	Scheduled  jsonOutcome `json:"scheduled"`
-	ValueSaved float64     `json:"value_saved"`
-	TasksSaved int         `json:"tasks_saved"`
+	Budget     int              `json:"budget"`
+	LeafCount  int              `json:"leaf_count"`
+	Overrun    int              `json:"overrun_tokens"`
+	Policy     *EffectivePolicy `json:"policy,omitempty"`
+	Naive      jsonOutcome      `json:"naive"`
+	Scheduled  jsonOutcome      `json:"scheduled"`
+	ValueSaved float64          `json:"value_saved"`
+	TasksSaved int              `json:"tasks_saved"`
 }
 
 func decisionJSON(d budget.Decision) jsonDecision {
@@ -123,18 +137,31 @@ func TreeJSON(root *tasktree.Task, budgetTokens int) (string, error) {
 }
 
 // FullJSON renders a run comparison as a JSON `run` document (indented,
-// trailing newline).
+// trailing newline) without an effective-policy block (the policy key is
+// omitted). Retained for callers that don't track a policy.
 func FullJSON(c sim.Comparison) (string, error) {
-	out := jsonRun{
+	return marshal(runDoc(c, nil))
+}
+
+// FullJSONWithPolicy renders a run comparison as a JSON `run` document and
+// carries the effective preemption policy that produced it, so a harness can
+// confirm which policy was applied (v0.3.0).
+func FullJSONWithPolicy(c sim.Comparison, p EffectivePolicy) (string, error) {
+	pol := p
+	return marshal(runDoc(c, &pol))
+}
+
+func runDoc(c sim.Comparison, p *EffectivePolicy) jsonRun {
+	return jsonRun{
 		Budget:     c.Budget,
 		LeafCount:  c.NaiveCount,
 		Overrun:    c.Overrun,
+		Policy:     p,
 		Naive:      outcomeJSON(c.Naive),
 		Scheduled:  outcomeJSON(c.Scheduled),
 		ValueSaved: c.ValueSaved,
 		TasksSaved: c.TasksSaved,
 	}
-	return marshal(out)
 }
 
 func marshal(v any) (string, error) {

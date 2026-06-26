@@ -109,6 +109,32 @@ tokensched run examples/overrun-tasktree.yaml --budget 200k --json
 
 被抢占（preempt）的子任务序列化时 `tier` 为空字符串。`plan --json` 则输出每个叶子的 `value` / `tiers` / `top_tier` / `init_tokens`，以及朴素需求与超支量。
 
+**4. 可插拔的抢占策略（`--policy`）：**
+
+`run` 可以接一份策略文件，把准入/抢占行为注入调度。最常用的旋钮是 `preempt_below_value`：声明价值低于阈值的子任务一律抢占，不管预算是否还有富余。
+
+```bash
+tokensched run examples/overrun-tasktree.yaml --budget 200k --policy policy.example.yaml
+```
+
+策略文件的 `preemption` 块（见 `policy.example.yaml`）：
+
+```yaml
+preemption:
+  prefer_downtier: true       # 抢占前先降档（Opus→Sonnet→Haiku）
+  preempt_below_value: 20     # 价值 < 20 的子任务直接抢占；0 表示禁用该地板（等于不带 --policy）
+```
+
+`run --json` 会带上实际生效的策略，方便 harness 确认跑的是哪份策略：
+
+```json
+{
+  "policy": { "source": "policy.example.yaml", "preempt_below_value": 20, "prefer_downtier": true, "active": true }
+}
+```
+
+不带 `--policy`（或 `preempt_below_value: 0`）时是无操作，行为与之前完全一致。
+
 ## <img src="https://api.iconify.design/tabler/photo.svg?color=%23f2b705" width="20" height="20" align="center" /> Demo
 
 同一棵 200k 预算下注定超支的任务树，两种执行方式的对比：朴素执行在窗口耗尽时硬截断掉 3 个子任务（含最重要的一个）；TokenSched 把低价值节点降级到 Haiku、保住全部高价值节点在 Opus 上，6 个子任务全部跑完且未超预算。
@@ -173,7 +199,8 @@ _ = plan
 | --- | --- | --- |
 | **v0.1.0** | ✅ 已发布 | `plan` 解析任务树并分配初始预算；`run` 回放朴素硬截断 vs 调度退让；按 value-per-token 贪心分配 + 降级/抢占；可 `import` 的分配器 / 抢占钩子 API；lipgloss 终端报告。 |
 | **v0.2.0** | ✅ 已发布 | `plan` / `run` 新增 `--json` 机器可读输出，便于直接接入 Agent harness；修复零成本子任务（免费价值）被错排到最后的 value-per-token 排序 bug。 |
-| v0.3 | 计划中 | 接入真实 token schema 与活计量；常驻 daemon 观察真实 5 小时窗口；用学习模型自动估计子任务价值；多 agent 共享预算池。 |
+| **v0.3.0** | ✅ 已发布 | `run --policy <file>` 把可插拔的抢占策略从 CLI 接通（`preempt_below_value` / `prefer_downtier`），`run --json` 带上实际生效的策略；修复超支松弛反复降同一分支、不在 frontier 上铺开的 bug。 |
+| v0.4 | 计划中 | 接入真实 token schema 与活计量；常驻 daemon 观察真实 5 小时窗口；用学习模型自动估计子任务价值；多 agent 共享预算池。 |
 
 **v0.1 明确不做**：拦截真实 Claude Code / Anthropic API 流量的 inline 网关 · 学习模型自动估值 · Web UI / dashboard · 多用户共享预算池 · 账号 / 云托管 / 收费档位 · token 压缩 / payload 减量（那是压缩器的活，TokenSched 是分配器）。
 
