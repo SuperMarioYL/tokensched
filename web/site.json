@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "name": "tokensched",
+  "github": "https://github.com/SuperMarioYL/tokensched",
+  "host": "tokensched.lei6393.com",
+  "lang": { "primary": "zh", "toggle": true },
+  "accent": ["#DC2626"],
+  "hero": {
+    "eyebrow": {
+      "zh": "预算到顶就让路 · 抢占真的动手 · 数字两边对得上 · 配置错了当场报错",
+      "en": "Yields at the cap · Preempt actually fires · Numbers agree on both sides · Bad config fails fast"
+    },
+    "headline": {
+      "zh": "你写的「抢占」策略只报告不动手——现在它真砍了\n到顶就让路，低价值工作被直接抢占，而不是悄悄降级",
+      "en": "Your 'preempt' policy only reported — now it actually cuts\nAt the cap, low-value work is preempted outright, not silently degraded"
+    },
+    "sub": {
+      "zh": "给长跑 Agent 写的一个 token 预算调度器。把一棵注定会撞墙的任务树交给它，它按子任务期望值预分配预算、预测超支，到顶时把低价值工作直接抢占掉（而不是只把它塞到便宜档位）。`run --json` 的超支与富余数字和终端报告完全一致；你在配置里写错的档位，当场就报错。",
+      "en": "A token-budget scheduler for long-running agents. Hand it a task tree that's bound to hit the wall — it pre-allocates the budget by sub-task value, predicts the overrun, and at the cap preempts low-value work outright (not just down-tiers it). `run --json`'s overrun and headroom numbers agree with the terminal report, and a tier you misconfigured in the tree fails fast."
+    },
+    "command": "tokensched run tree.yaml --budget 200k --policy policy.yaml",
+    "cta": { "zh": "开始使用", "en": "Get started" },
+    "ctaGithub": { "zh": "在 GitHub 查看", "en": "View on GitHub" }
+  },
+  "advantages": [
+    {
+      "title": { "zh": "你写的「抢占」策略，现在真的动手了", "en": "The 'preempt' policy you wrote now actually fires" },
+      "body": {
+        "zh": "以前 `prefer_downtier` 旋钮接进了 CLI，却只让它在 `run --json` 里露个脸，调度器照旧先把低价值任务塞去便宜档位、再考虑抢占。现在把 `prefer_downtier` 设成 `false`，预算不够时分配器会直接抢占那个塞不下的子任务——丢掉它，而不是偷偷降级。紧预算砍掉的是低价值工作，而不是把所有工作都往下压一档。`run --json` 的 `policy.active` 也诚实地反映这次切换。",
+        "en": "The `prefer_downtier` knob was wired to the CLI but left reported-only — the scheduler always down-tiered the low-value task before ever preempting. Now set `prefer_downtier` to `false` and, when the budget can't cover a sub-task, the allocator preempts it outright — drops it, instead of quietly salvaging it on a cheaper tier. A tight budget drops low-priority work, rather than degrading every task by one notch. `run --json`'s `policy.active` honestly reflects the switch."
+      },
+      "chips": [
+        "› 抢占先于降档",
+        "› 低价值工作直接砍",
+        "› policy.active 诚实反映"
+      ]
+    },
+    {
+      "title": { "zh": "`run --json` 和终端报告，数字终于对得上了", "en": "`run --json` and the terminal report finally agree" },
+      "body": {
+        "zh": "以前 JSON 在预算还有富余时会吐一个原始的、可能是负数的 `overrun_tokens`（比如 -50000），终端报告却静悄悄地夹成 0、对富余只字不提——解析 JSON 的编排框架看见 -50000，根本分不清这是超支还是富余。现在两边都把 `overrun_tokens` 夹到非负，新增的 `headroom_tokens` 报告预算富余；终端报告也直说「朴素方案放得下，富余 N 个 token」。一个数字，两个出口，讲的是同一件事。",
+        "en": "The JSON used to emit a raw, possibly negative `overrun_tokens` when the tree fit the budget (say -50000), while the terminal report silently clamped it to 0 and never mentioned the surplus — so a harness parsing the JSON saw -50000 with no way to tell overrun from headroom. Both surfaces now clamp `overrun_tokens` to non-negative, a new `headroom_tokens` reports the budget surplus, and the terminal report says plainly 'naive plan fits — headroom N tokens'. One number, two surfaces, the same story."
+      },
+      "chips": [
+        "› overrun 夹到非负",
+        "› 新增 headroom_tokens",
+        "› 两边数字一致"
+      ]
+    },
+    {
+      "title": { "zh": "配置里写错的档位，当场报错", "en": "A misconfigured tier fails fast" },
+      "body": {
+        "zh": "一个子任务声明 `tiers: [opus]`，却给 `est_tokens: {haiku: 5000}`——以前工具默默存下这条 Haiku 估算、然后永远无视它（Haiku 根本不在允许档位里，从不会被选中），把你大概率想说的「Haiku 也可用」藏成一个静默错误，直到跑到一半才发现事情不对。现在 tasktree 直接拒绝这种配置，报错指名道姓点出那个不在档位列表里的 tier。",
+        "en": "A sub-task declaring `tiers: [opus]` but quoting `est_tokens: {haiku: 5000}` used to be stored silently and then ignored — Haiku is never selected because it isn't in the allowed tiers — hiding a misconfiguration you very likely meant as 'Haiku is eligible too', only to discover halfway through a run that something was off. The task tree now rejects this on parse, with an error that names the offending tier not in the list."
+      },
+      "chips": [
+        "› 不在档位列表里的 tier 拒收",
+        "› 报错指名点姓",
+        "› 不再静默无视"
+      ]
+    },
+    {
+      "title": { "zh": "把硬截断，变成可调度的软退让", "en": "Hard truncation, turned into a scheduled yield" },
+      "body": {
+        "zh": "长跑 Agent 在用量窗口里跑一长串子任务，撞墙时被硬截断——而被截断的常常恰好是排在后面、最重要的那一段。tokensched 像调度 CPU 时间片一样调度 token 预算：按子任务期望值预分配，高价值子任务永远不是第一个被砍的；动手前就预测出朴素「全顶档」方案会超支多少；到顶时让低价值工作先让路，把高价值工作留在顶档上。整棵树跑在预算窗口内，而不是在窗口耗尽时丢掉最重要的一块。",
+        "en": "A long-running agent drives a chain of sub-tasks through a usage window and gets hard-truncated at the wall — and the truncated work is too often the most important piece, queued last. tokensched schedules the token budget the way an OS schedules CPU time-slices: it pre-allocates by sub-task expected value so a high-value task is never the first cut, predicts the naive all-top-tier overrun before it starts, and at the cap lets the low-value work yield first — keeping the high-value work on the top tier. The whole tree lands inside the budget window, instead of losing its most important piece when the window runs out."
+      },
+      "chips": [
+        "› 按期望值预分配",
+        "› 动手前预测超支",
+        "› 低价值先让路"
+      ]
+    }
+  ],
+  "scene": {
+    "kind": "hub-nodes",
+    "nodes": ["Silent overrun", "Reported-only preempt", "Mismatched JSON", "Hard truncation"]
+  },
+  "cta": {
+    "headline": {
+      "zh": "一棵任务树 + 一份策略文件，守住你的 token 预算",
+      "en": "One task tree + one policy file, your token budget holds"
+    },
+    "sub": {
+      "zh": "开源、MIT、无付费墙。给 Agent 的 token 预算装调度器这件事，永不收费。",
+      "en": "Open source, MIT, no paywall. The act of scheduling your agent's token budget is never gated."
+    },
+    "button": { "zh": "在 GitHub 上开始", "en": "Get started on GitHub" }
+  },
+  "footer": {
+    "tag": {
+      "zh": "给长跑 Agent 的 token 预算调度器",
+      "en": "The token-budget scheduler for long-running agents"
+    }
+  }
+}
