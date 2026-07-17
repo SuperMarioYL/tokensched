@@ -189,3 +189,47 @@ func TestPreemptionHook(t *testing.T) {
 		t.Fatalf("keepme should be kept, got %s", d.Action)
 	}
 }
+
+// TestPreferDownTierFalsePreemptsInsteadOfDownTiering (v0.4.0): with
+// PreferDownTier explicitly false, a task whose top tier does not fit is
+// preempted outright instead of being salvaged on a cheaper tier. The default
+// (nil) path still down-tiers the same task — regression guard.
+func TestPreferDownTierFalsePreemptsInsteadOfDownTiering(t *testing.T) {
+	root := tree(
+		// 'big' takes the whole Opus budget on its top tier.
+		leaf("big", 100, allTiers(), map[tier.Tier]int{tier.Opus: 100_000, tier.Sonnet: 40_000, tier.Haiku: 12_000}),
+		// 'small' won't fit on Opus in what's left, but fits on Haiku.
+		leaf("small", 30, allTiers(), map[tier.Tier]int{tier.Opus: 80_000, tier.Sonnet: 32_000, tier.Haiku: 9_000}),
+	)
+	falseFlag := false
+	ds := NewGreedyAllocator(&Options{PreferDownTier: &falseFlag}).Allocate(root, 110_000)
+
+	small := decisionFor(ds, "small")
+	if small.Action != Preempt {
+		t.Fatalf("PreferDownTier=false: small task should be preempted (not down-tiered), got %s", small.Action)
+	}
+	if small.Budget != 0 {
+		t.Fatalf("preempted task should have 0 budget, got %d", small.Budget)
+	}
+
+	// Default path still down-tiers the same task.
+	dsDef := NewGreedyAllocator(nil).Allocate(root, 110_000)
+	if d := decisionFor(dsDef, "small"); d.Action != DownTier {
+		t.Fatalf("default (nil) path should down-tier small, got %s", d.Action)
+	}
+}
+
+// TestPreferDownTierTrueExplicitMatchesDefault: an explicit true matches the
+// nil/default behaviour (down-tier before preempt) — no behavioural drift.
+func TestPreferDownTierTrueExplicitMatchesDefault(t *testing.T) {
+	root := tree(
+		leaf("big", 100, allTiers(), map[tier.Tier]int{tier.Opus: 100_000, tier.Sonnet: 40_000, tier.Haiku: 12_000}),
+		leaf("small", 30, allTiers(), map[tier.Tier]int{tier.Opus: 80_000, tier.Sonnet: 32_000, tier.Haiku: 9_000}),
+	)
+	trueFlag := true
+	dsT := NewGreedyAllocator(&Options{PreferDownTier: &trueFlag}).Allocate(root, 110_000)
+	dsDef := NewGreedyAllocator(nil).Allocate(root, 110_000)
+	if d, dDef := decisionFor(dsT, "small"), decisionFor(dsDef, "small"); d.Action != dDef.Action || d.Tier != dDef.Tier {
+		t.Fatalf("explicit true should match default: true=%s/%s default=%s/%s", d.Action, d.Tier, dDef.Action, dDef.Tier)
+	}
+}

@@ -29,8 +29,14 @@ type Outcome struct {
 
 // Comparison bundles both outcomes for reporting.
 type Comparison struct {
-	Budget     int
-	Overrun    int // naive all-top-tier deficit vs budget (positive => overrun)
+	Budget  int
+	Overrun int // naive all-top-tier deficit vs budget (positive => overrun)
+	// Headroom is the naive budget headroom: budget minus the naive all-top-tier
+	// demand, clamped to >= 0. It is the positive counterpart of Overrun — when
+	// the tree fits, Overrun is 0 (clamped for display) and Headroom reports how
+	// many tokens remain. Surfaced so run --json and the terminal report can
+	// agree on overrun vs headroom (v0.4.0).
+	Headroom   int
 	NaiveCount int // number of leaf tasks
 	Naive      Outcome
 	Scheduled  Outcome
@@ -39,19 +45,38 @@ type Comparison struct {
 }
 
 // Replay runs both strategies over root against budget and returns the
-// comparison. hook is forwarded to the scheduler (pass nil for none).
+// comparison. hook is forwarded to the scheduler (pass nil for none). It is a
+// back-compat wrapper around ReplayWithOpts for callers that only need a
+// preemption hook; use ReplayWithOpts to also pass a PreferDownTier policy
+// (v0.4.0).
 func Replay(root *tasktree.Task, budgetTokens int, hook budget.PreemptionHook) Comparison {
+	return ReplayWithOpts(root, budgetTokens, &schedule.Options{Hook: hook})
+}
+
+// ReplayWithOpts runs both strategies over root against budget, forwarding the
+// full scheduler options (hook + PreferDownTier policy) to the scheduler. It is
+// the entry point that honours the prefer_downtier:false policy (v0.4.0): a nil
+// opts is treated as the default (no hook, down-tier preferred).
+func ReplayWithOpts(root *tasktree.Task, budgetTokens int, opts *schedule.Options) Comparison {
 	leaves := tasktree.Leaves(root)
 
 	naive := replayNaive(leaves, budgetTokens)
 
-	sched := schedule.New(&schedule.Options{Hook: hook})
+	sched := schedule.New(opts)
 	plan := sched.Schedule(root, budgetTokens)
 	scheduled := outcomeFromPlan(plan)
+
+	// Overrun = naive demand - budget (may be negative when the tree fits).
+	// Headroom is its positive counterpart, clamped to >= 0.
+	headroom := 0
+	if plan.Overrun < 0 {
+		headroom = -plan.Overrun
+	}
 
 	return Comparison{
 		Budget:     budgetTokens,
 		Overrun:    plan.Overrun,
+		Headroom:   headroom,
 		NaiveCount: len(leaves),
 		Naive:      naive,
 		Scheduled:  scheduled,

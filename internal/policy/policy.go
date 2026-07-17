@@ -30,10 +30,10 @@ type Policy struct {
 	// (the no-policy default — every task is admitted by value-per-token).
 	PreemptBelowValue float64
 	// PreferDownTier: down-tier (Opus->Sonnet->Haiku) before preempting. The
-	// scheduler already prefers down-tier; this field is surfaced so a harness
-	// can confirm the policy it ran under. A false value does not currently
-	// disable down-tiering (that would be a behavioural change deferred past
-	// v0.3.0); it is reported as-loaded.
+	// scheduler's default is to down-tier first; as of v0.4.0 a false value is
+	// HONOURED — the allocator switches to preempt-before-down-tier (a task
+	// that does not fit on its top tier is dropped outright instead of being
+	// salvaged on a cheaper model). Before v0.4.0 this field was reported-only.
 	PreferDownTier bool
 }
 
@@ -101,7 +101,20 @@ func (p Policy) Hook() budget.PreemptionHook {
 }
 
 // Active reports whether the policy changes scheduling vs the no-policy default
-// (i.e. whether Hook returns a non-nil hook).
+// (i.e. whether it sets a preemption threshold OR switches off down-tiering).
+// A positive preempt_below_value or an explicit prefer_downtier:false both count
+// as active; the no-policy default (threshold 0, prefer_downtier true) is inactive.
 func (p Policy) Active() bool {
-	return p.PreemptBelowValue > 0
+	return p.PreemptBelowValue > 0 || !p.PreferDownTier
+}
+
+// ScheduleOptions projects this policy into the scheduler's options, so the CLI
+// can forward both knobs (the preemption hook and the PreferDownTier flag) in
+// one call. The returned PreferDownTier pointer is always non-nil —
+// Default()/Parse() always set a concrete bool — so the allocator's default-true
+// path is only taken when the policy explicitly left prefer_downtier true
+// (v0.4.0).
+func (p Policy) ScheduleOptions() *schedule.Options {
+	pd := p.PreferDownTier
+	return &schedule.Options{Hook: p.Hook(), PreferDownTier: &pd}
 }

@@ -29,7 +29,8 @@ type jsonPlan struct {
 	Budget      int        `json:"budget,omitempty"`
 	LeafCount   int        `json:"leaf_count"`
 	NaiveDemand int        `json:"naive_demand_tokens"`
-	Overrun     int        `json:"overrun_tokens"` // naive demand - budget (0 when no budget given)
+	Overrun     int        `json:"overrun_tokens"`  // naive demand - budget, clamped to >= 0 (v0.4.0)
+	Headroom    int        `json:"headroom_tokens"` // budget - naive demand, clamped to >= 0 (v0.4.0)
 	Leaves      []jsonLeaf `json:"leaves"`
 }
 
@@ -66,11 +67,14 @@ type EffectivePolicy struct {
 }
 
 // jsonRun is the `run --json` document. Policy is omitted by the legacy FullJSON
-// path (nil) and populated by FullJSONWithPolicy.
+// path (nil) and populated by FullJSONWithPolicy. Overrun is clamped to >= 0 and
+// paired with Headroom so a harness can always tell overrun from headroom
+// (v0.4.0); the pre-v0.4.0 raw (possibly negative) overrun_tokens is gone.
 type jsonRun struct {
 	Budget     int              `json:"budget"`
 	LeafCount  int              `json:"leaf_count"`
-	Overrun    int              `json:"overrun_tokens"`
+	Overrun    int              `json:"overrun_tokens"`  // naive demand - budget, clamped to >= 0
+	Headroom   int              `json:"headroom_tokens"` // budget - naive demand, clamped to >= 0
 	Policy     *EffectivePolicy `json:"policy,omitempty"`
 	Naive      jsonOutcome      `json:"naive"`
 	Scheduled  jsonOutcome      `json:"scheduled"`
@@ -109,7 +113,10 @@ func outcomeJSON(o sim.Outcome) jsonOutcome {
 }
 
 // TreeJSON renders a task tree as a JSON `plan` document (indented, trailing
-// newline). budgetTokens of 0 means "no budget given": overrun is reported as 0.
+// newline). budgetTokens of 0 means "no budget given": overrun and headroom are
+// both 0. Otherwise overrun_tokens is max(0, demand-budget) and headroom_tokens
+// is max(0, budget-demand), so the two never disagree and neither is negative
+// (v0.4.0).
 func TreeJSON(root *tasktree.Task, budgetTokens int) (string, error) {
 	leaves := tasktree.Leaves(root)
 	out := jsonPlan{
@@ -131,7 +138,8 @@ func TreeJSON(root *tasktree.Task, budgetTokens int) (string, error) {
 		})
 	}
 	if budgetTokens > 0 {
-		out.Overrun = out.NaiveDemand - budgetTokens
+		out.Overrun = max(0, out.NaiveDemand-budgetTokens)
+		out.Headroom = max(0, budgetTokens-out.NaiveDemand)
 	}
 	return marshal(out)
 }
@@ -155,7 +163,8 @@ func runDoc(c sim.Comparison, p *EffectivePolicy) jsonRun {
 	return jsonRun{
 		Budget:     c.Budget,
 		LeafCount:  c.NaiveCount,
-		Overrun:    c.Overrun,
+		Overrun:    max(0, c.Overrun), // clamp: never emit a negative overrun (v0.4.0)
+		Headroom:   c.Headroom,
 		Policy:     p,
 		Naive:      outcomeJSON(c.Naive),
 		Scheduled:  outcomeJSON(c.Scheduled),

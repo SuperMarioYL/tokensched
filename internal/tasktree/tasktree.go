@@ -178,10 +178,27 @@ func decodeEstTokens(yt *yamlTask, tiers []tier.Tier) (map[tier.Tier]int, error)
 		if err := yt.EstTokens.Decode(&raw); err != nil {
 			return nil, fmt.Errorf("task %q: est_tokens map: %w", yt.ID, err)
 		}
+		// An est_tokens map may name a tier the task is NOT eligible for
+		// (e.g. tiers:[opus] + est_tokens:{haiku:5000}). Storing it would
+		// silently hide a contradictory input: the tier is never selected
+		// (tier.Lower only walks the allowed set), so the estimate is kept
+		// but unused and the user most likely believes the tier is
+		// eligible because they quoted a cost for it. Reject it up front.
+		allowed := make(map[tier.Tier]bool, len(tiers))
+		for _, tr := range tiers {
+			allowed[tr] = true
+		}
+		var names []string
+		for _, tr := range tiers {
+			names = append(names, tr.String())
+		}
 		for name, v := range raw {
 			tr, err := tier.Parse(name)
 			if err != nil {
 				return nil, fmt.Errorf("task %q: est_tokens key: %w", yt.ID, err)
+			}
+			if !allowed[tr] {
+				return nil, fmt.Errorf("task %q: est_tokens tier %q is not in the eligible tiers [%s]", yt.ID, tr, strings.Join(names, ", "))
 			}
 			out[tr] = v
 		}

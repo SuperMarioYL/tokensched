@@ -71,6 +71,25 @@ type Allocator interface {
 type Options struct {
 	// Hook, if non-nil, is consulted per task (see PreemptionHook).
 	Hook PreemptionHook
+	// PreferDownTier, when non-nil, controls overrun resolution: true (the
+	// default) keeps the v0.2 behaviour of down-tiering a task (Opus -> Sonnet
+	// -> Haiku) before preempting it; false switches the allocator to
+	// preempt-before-down-tier — a task whose top tier does not fit is dropped
+	// outright instead of being salvaged on a cheaper model. A nil pointer means
+	// "unset" and is treated as true, so NewGreedyAllocator(nil) and every
+	// pre-v0.4.0 caller keep their behaviour. Honoured by the CLI via the
+	// policy file's prefer_downtier knob (v0.4.0).
+	PreferDownTier *bool
+}
+
+// preferDown resolves the PreferDownTier option to its effective bool, defaulting
+// to true when the pointer is nil (preserving the historical down-tier-first
+// behaviour).
+func (o Options) preferDown() bool {
+	if o.PreferDownTier != nil {
+		return *o.PreferDownTier
+	}
+	return true
 }
 
 // GreedyAllocator allocates by descending value-per-token. Each leaf task is
@@ -150,7 +169,11 @@ func (a *GreedyAllocator) Allocate(root *tasktree.Task, budget int) []Decision {
 
 // place is the core greedy step for one task against the remaining budget. It
 // tries the highest eligible tier first (Keep), then walks down to cheaper
-// eligible tiers (DownTier), and Preempts when nothing fits.
+// eligible tiers (DownTier), and Preempts when nothing fits. When
+// PreferDownTier is explicitly false, the down-tier walk is skipped — a task
+// that does not fit on its top tier is preempted outright (preempt-before-
+// down-tier), so a tight budget drops low-priority work instead of salvaging
+// it on a cheaper model (v0.4.0).
 func (a *GreedyAllocator) place(t *tasktree.Task, remaining int) Decision {
 	top := t.HighestTier()
 	topEst := t.EstAt(top)
@@ -163,6 +186,18 @@ func (a *GreedyAllocator) place(t *tasktree.Task, remaining int) Decision {
 			Budget: topEst,
 			Value:  t.ValueAt(top),
 			Reason: fmt.Sprintf("fits on %s at %d tok (v/tok=%s); kept", top, topEst, vptStr(t, top)),
+		}
+	}
+
+	// prefer_downtier:false => preempt a non-fitting task instead of down-tiering.
+	if !a.opts.preferDown() {
+		return Decision{
+			TaskID: t.ID,
+			Action: Preempt,
+			Tier:   tier.Unknown,
+			Budget: 0,
+			Value:  0,
+			Reason: fmt.Sprintf("no top-tier fit on %s (%d>%d rem) and prefer_downtier=false; preempted", top, topEst, remaining),
 		}
 	}
 

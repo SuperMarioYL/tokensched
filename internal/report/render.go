@@ -89,7 +89,7 @@ func Tree(root *tasktree.Task, budgetTokens int) string {
 		if over > 0 {
 			b.WriteString("  " + bad.Render(fmt.Sprintf("(overruns budget by %s)", humanInt(over))))
 		} else {
-			b.WriteString("  " + good.Render("(fits budget)"))
+			b.WriteString("  " + good.Render(fmt.Sprintf("(fits budget, headroom %s)", humanInt(budgetTokens-want))))
 		}
 	}
 	b.WriteString("\n")
@@ -129,8 +129,20 @@ func Decisions(ds []budget.Decision) string {
 func Comparison(c sim.Comparison) string {
 	var b strings.Builder
 	b.WriteString(title.Render("Hard-truncation vs scheduled-yield") + "\n")
-	b.WriteString(subtle.Render(fmt.Sprintf("budget %s tokens · %d leaf tasks · naive plan overruns by %s tokens",
-		humanInt(c.Budget), c.NaiveCount, humanInt(maxInt(c.Overrun, 0)))) + "\n\n")
+	// Surface overrun vs headroom honestly on both surfaces (v0.4.0): when the
+	// naive plan fits, say so and report the headroom instead of clamping a
+	// negative overrun to 0 and saying nothing.
+	var overLine string
+	switch {
+	case c.Overrun > 0:
+		overLine = fmt.Sprintf("naive plan overruns by %s tokens", humanInt(c.Overrun))
+	case c.Headroom > 0:
+		overLine = subtle.Render(fmt.Sprintf("naive plan fits — headroom %s tokens", humanInt(c.Headroom)))
+	default:
+		overLine = "naive plan fits the budget exactly"
+	}
+	b.WriteString(subtle.Render(fmt.Sprintf("budget %s tokens · %d leaf tasks · %s",
+		humanInt(c.Budget), c.NaiveCount, overLine)) + "\n\n")
 
 	rows := [][]string{
 		{"METRIC", "NAIVE HARD-TRUNCATION", "TOKENSCHED SCHEDULED"},
@@ -222,13 +234,6 @@ func truncate(s string, n int) string {
 		return s[:n]
 	}
 	return s[:n-1] + "…"
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 // humanInt renders large token counts compactly (e.g. 200000 -> 200k).

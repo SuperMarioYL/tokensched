@@ -21,7 +21,7 @@ import (
 
 // version is overridable at build time with
 // -ldflags "-X main.version=vX.Y.Z".
-var version = "v0.3.0-dev"
+var version = "v0.4.0-dev"
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
@@ -110,7 +110,10 @@ func newRunCmd() *cobra.Command {
 					return err
 				}
 			}
-			cmp := sim.Replay(root, budgetTokens, pol.Hook())
+			// Replay with the full policy options so BOTH knobs take effect: the
+			// preemption hook (preempt_below_value) and the PreferDownTier flag
+			// (prefer_downtier:false => preempt-before-down-tier, v0.4.0).
+			cmp := sim.ReplayWithOpts(root, budgetTokens, pol.ScheduleOptions())
 			if asJSON {
 				out, err := report.FullJSONWithPolicy(cmp, report.EffectivePolicy{
 					Source:            policyOrDefault(policyPath),

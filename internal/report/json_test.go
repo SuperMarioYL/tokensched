@@ -131,3 +131,81 @@ func TestFullJSONRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+// TestRunJSONOverrunClampedAndHeadroomShown (v0.4.0): an under-budget tree must
+// NOT emit a negative overrun_tokens; overrun is 0 and headroom_tokens carries
+// the budget surplus. Pre-v0.4.0 the JSON emitted a raw negative overrun.
+func TestRunJSONOverrunClampedAndHeadroomShown(t *testing.T) {
+	// naive demand 90k < budget 200k => overrun 0, headroom 110k.
+	root := tree(leaf("a", 100, osh(90_000, 36_000, 10_800)))
+	cmp := sim.Replay(root, 200_000, nil)
+	s, err := FullJSON(cmp)
+	if err != nil {
+		t.Fatalf("FullJSON: %v", err)
+	}
+	var doc struct {
+		Overrun  int `json:"overrun_tokens"`
+		Headroom int `json:"headroom_tokens"`
+	}
+	if err := json.Unmarshal([]byte(s), &doc); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, s)
+	}
+	if doc.Overrun != 0 {
+		t.Fatalf("overrun = %d, want 0 (clamped, no negative overrun)", doc.Overrun)
+	}
+	if doc.Headroom != 110_000 {
+		t.Fatalf("headroom = %d, want 110000", doc.Headroom)
+	}
+}
+
+// TestRunJSONOverrunPositiveHeadroomZero (v0.4.0): an over-budget tree reports a
+// positive overrun and zero headroom.
+func TestRunJSONOverrunPositiveHeadroomZero(t *testing.T) {
+	// naive demand 240k > budget 100k => overrun 140k, headroom 0.
+	root := tree(
+		leaf("a", 100, osh(80_000, 32_000, 9_600)),
+		leaf("b", 50, osh(80_000, 32_000, 9_600)),
+		leaf("c", 3, osh(80_000, 32_000, 9_600)),
+	)
+	cmp := sim.Replay(root, 100_000, nil)
+	s, err := FullJSON(cmp)
+	if err != nil {
+		t.Fatalf("FullJSON: %v", err)
+	}
+	var doc struct {
+		Overrun  int `json:"overrun_tokens"`
+		Headroom int `json:"headroom_tokens"`
+	}
+	if err := json.Unmarshal([]byte(s), &doc); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if doc.Overrun != 140_000 {
+		t.Fatalf("overrun = %d, want 140000", doc.Overrun)
+	}
+	if doc.Headroom != 0 {
+		t.Fatalf("headroom = %d, want 0", doc.Headroom)
+	}
+}
+
+// TestTreeJSONHeadroomAndClampedOverrun (v0.4.0): plan --json also clamps
+// overrun and reports headroom for a fitting tree.
+func TestTreeJSONHeadroomAndClampedOverrun(t *testing.T) {
+	root := tree(leaf("a", 100, osh(90_000, 36_000, 10_800)))
+	s, err := TreeJSON(root, 200_000)
+	if err != nil {
+		t.Fatalf("TreeJSON: %v", err)
+	}
+	var doc struct {
+		Overrun  int `json:"overrun_tokens"`
+		Headroom int `json:"headroom_tokens"`
+	}
+	if err := json.Unmarshal([]byte(s), &doc); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if doc.Overrun != 0 {
+		t.Fatalf("overrun = %d, want 0", doc.Overrun)
+	}
+	if doc.Headroom != 110_000 {
+		t.Fatalf("headroom = %d, want 110000", doc.Headroom)
+	}
+}

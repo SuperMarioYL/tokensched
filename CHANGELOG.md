@@ -5,6 +5,38 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-17
+
+### Added
+
+- **`prefer_downtier: false` now actually preempts instead of down-tiering.**
+  v0.3.0 made the `preempt_below_value` policy knob reachable from the CLI but
+  left the policy file's second documented knob, `prefer_downtier`, as a
+  reported-only no-op (`run --json` echoed it but the scheduler always down-tiered
+  before preempting). As of v0.4.0 a `prefer_downtier: false` policy switches the
+  allocator to preempt-before-down-tier: a sub-task whose top tier does not fit
+  the remaining budget is dropped outright instead of being salvaged on a cheaper
+  model, so a tight budget drops low-priority work rather than degrading it.
+  `run --json`'s `policy.active` now honestly reflects the change (true for
+  `prefer_downtier: false` even with no `preempt_below_value`).
+
+### Fixed
+
+- **`run --json` and the terminal report now agree on overrun vs headroom.**
+  The JSON document emitted a raw (possibly negative) `overrun_tokens` when the
+  tree fit the budget, while the terminal report clamped it to 0 and never
+  mentioned headroom — so a harness parsing `run --json` saw
+  `overrun_tokens: -50000` with no way to distinguish overrun from headroom.
+  `overrun_tokens` is now clamped to `>= 0` on both surfaces and a new
+  `headroom_tokens` field reports the budget surplus; the terminal report says
+  "naive plan fits — headroom N tokens" instead of silently clamping.
+- **Contradictory `est_tokens` for a non-eligible tier now fail fast.** A task
+  declaring `tiers: [opus]` but quoting `est_tokens: {haiku: 5000}` previously
+  stored the haiku estimate and then silently ignored it (Haiku is never selected
+  because it is not in the allowed tiers), hiding a misconfiguration the user
+  very likely intended as "Haiku is eligible". `tasktree` now rejects it with a
+  clear error naming the offending tier.
+
 ## [0.3.0] - 2026-06-27
 
 ### Added
@@ -92,6 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tier` cost/capability coefficients — so the allocator can be vendored into an
   agent harness.
 
+[0.4.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.4.0
 [0.3.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.1.0

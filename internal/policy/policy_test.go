@@ -124,3 +124,40 @@ tiers:
 		t.Fatal("sanity: sample should mention preempt_below_value")
 	}
 }
+
+// TestActive_TrueForPreferDownTierFalse (v0.4.0): prefer_downtier:false changes
+// scheduling (preempt-before-down-tier) even with no threshold, so Active() must
+// be true — the --json `active` field is now honest about the second knob.
+func TestActive_TrueForPreferDownTierFalse(t *testing.T) {
+	p := mustParse(t, `preemption: {prefer_downtier: false}`)
+	if !p.Active() {
+		t.Fatalf("prefer_downtier:false should make Active() true (it changes scheduling), got false")
+	}
+	// It does NOT set a preemption hook (no threshold) — the effect is via the
+	// allocator's PreferDownTier flag, not the hook.
+	if p.Hook() != nil {
+		t.Fatalf("prefer_downtier:false should NOT set a hook (no threshold), got non-nil")
+	}
+}
+
+// TestScheduleOptions_WiresPreferDownTier (v0.4.0): ScheduleOptions forwards both
+// the hook and the PreferDownTier flag so the CLI can honour prefer_downtier:false.
+func TestScheduleOptions_WiresPreferDownTier(t *testing.T) {
+	// prefer_downtier:false => ScheduleOptions.PreferDownTier points at false.
+	pFalse := mustParse(t, `preemption: {prefer_downtier: false}`)
+	so := pFalse.ScheduleOptions()
+	if so == nil || so.PreferDownTier == nil || *so.PreferDownTier {
+		t.Fatalf("prefer_downtier:false should wire a non-nil *bool == false")
+	}
+	// Default (prefer_downtier true) => ScheduleOptions.PreferDownTier points at true.
+	soDef := Default().ScheduleOptions()
+	if soDef == nil || soDef.PreferDownTier == nil || !*soDef.PreferDownTier {
+		t.Fatalf("default should wire a non-nil *bool == true")
+	}
+	// A positive threshold still yields a hook alongside the flag.
+	pThresh := mustParse(t, `preemption: {prefer_downtier: true, preempt_below_value: 10}`)
+	soT := pThresh.ScheduleOptions()
+	if soT.Hook == nil {
+		t.Fatalf("threshold policy should forward a non-nil hook")
+	}
+}

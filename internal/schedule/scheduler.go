@@ -36,6 +36,11 @@ type Options struct {
 	// Hook is forwarded to the allocator and consulted again during overrun
 	// resolution.
 	Hook budget.PreemptionHook
+	// PreferDownTier is forwarded to the allocator. nil => default
+	// (down-tier before preempt, the historical behaviour); an explicit false
+	// switches the allocator to preempt-before-down-tier. Wired from the policy
+	// file's prefer_downtier knob by the CLI (v0.4.0).
+	PreferDownTier *bool
 }
 
 // New builds a Scheduler backed by a GreedyAllocator.
@@ -45,7 +50,7 @@ func New(opts *Options) *Scheduler {
 		o = *opts
 	}
 	return &Scheduler{
-		alloc: budget.NewGreedyAllocator(&budget.Options{Hook: o.Hook}),
+		alloc: budget.NewGreedyAllocator(&budget.Options{Hook: o.Hook, PreferDownTier: o.PreferDownTier}),
 		opts:  o,
 	}
 }
