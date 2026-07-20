@@ -11,7 +11,7 @@
 
 <p>
   <a href="https://golang.org"><img src="https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white" alt="Go 1.24" /></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License MIT" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0" /></a>
   <a href="https://github.com/SuperMarioYL/tokensched/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SuperMarioYL/tokensched/ci.yml?branch=main&label=build" alt="Build" /></a>
   <a href="https://github.com/SuperMarioYL/tokensched/stargazers"><img src="https://img.shields.io/github/stars/SuperMarioYL/tokensched?style=flat&logo=github" alt="GitHub stars" /></a>
 </p>
