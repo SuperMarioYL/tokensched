@@ -13,8 +13,13 @@ budget: 200000
 #   value-per-token  greedy admission by realised-value / estimated-tokens (default)
 strategy: value-per-token
 
-# Preemption policy. When the budget cannot cover every sub-task, the scheduler
-# relaxes the lowest-marginal-value task first.
+# Preemption policy. Overrun is resolved entirely by the greedy allocator pass
+# (it down-tiers or preempts each task against the remaining budget as it walks
+# candidates). v0.5.0 removed the separate scheduler "relax the lowest-marginal-
+# value task first" loop — it was provably unreachable (Allocate.place() only
+# ever commits Budget <= remaining, so total(decisions) could never exceed the
+# budget); the knobs below tune the allocator's down-tier-vs-preempt ordering
+# and its preemption hook.
 preemption:
   # Down-tier (Opus -> Sonnet -> Haiku) before preempting. Preempt a task only
   # when it is already on its cheapest eligible tier (not down-tierable).

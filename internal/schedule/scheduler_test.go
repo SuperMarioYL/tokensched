@@ -1,6 +1,8 @@
 package schedule
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/SuperMarioYL/tokensched/internal/budget"
@@ -136,73 +138,152 @@ func TestPreemptOnlyWhenNotDownTierable(t *testing.T) {
 	}
 }
 
-// TestRelaxSpreadsAcrossFrontier (v0.3.0 regression): two relax steps must fall
-// on two DIFFERENT tasks. Before the fix, lowestMarginalRunning ranked by raw
-// realised Value, which relax() lowers on down-tier, so the same just-down-tiered
-// task was re-selected and marched to the floor while sibling low-value tasks
-// were never touched. Ranking by value density (stable under down-tiering) +
-// preferring down-tierable victims spreads relaxation across the frontier.
-func TestRelaxSpreadsAcrossFrontier(t *testing.T) {
-	// Three close-value, down-tierable running tasks. We hand the relax loop a
-	// decision set + task map directly and run two relaxation steps, asserting
-	// the two victims are distinct.
-	tasks := map[string]*tasktree.Task{
-		"x": leaf("x", 31, opusSonnetHaiku(30_000, 12_000, 3_600)),
-		"y": leaf("y", 30, opusSonnetHaiku(30_000, 12_000, 3_600)),
-		"z": leaf("z", 29, opusSonnetHaiku(30_000, 12_000, 3_600)),
-	}
-	dec := func(id string) budget.Decision {
-		t := tasks[id]
-		return budget.Decision{
-			TaskID: id, Action: budget.Keep, Tier: tier.Opus,
-			Budget: t.EstAt(tier.Opus), Value: t.ValueAt(tier.Opus),
-		}
-	}
-	decisions := []budget.Decision{dec("x"), dec("y"), dec("z")}
+// ---------------------------------------------------------------------------
+// v0.5.0 regression note: removed the unreachable Schedule() relax loop.
+// ---------------------------------------------------------------------------
+//
+// v0.5.0 removed Schedule()'s post-Allocate "relax the lowest-marginal-value
+// running task" loop:
+//
+//	for total(decisions) > budgetTokens {
+//	    victim := lowestMarginalRunning(decisions, taskByID)
+//	    if victim == nil { break }
+//	    relax(byID[victim.TaskID], taskByID[victim.TaskID], s.opts.Hook, ...)
+//	}
+//
+// It was provably UNREACHABLE: GreedyAllocator.Allocate conserves budget by
+// construction — place()/applyForced() only ever commit Decision.Budget <= the
+// remaining budget at placement time (and preempted tasks commit 0) — so the
+// loop's condition (total(decisions) > budgetTokens) could never be true. The
+// documented "scheduler relaxes the lowest-marginal-value task first"
+// behaviour was a production no-op; overrun is resolved entirely inside the
+// greedy Allocate() pass.
+//
+// The two direct-call tests below (TestRelaxSpreadsAcrossFrontier and
+// TestRelaxPrefersDownTierableVictim) previously exercised lowestMarginalRunning
+// and relax() in isolation, bypassing Schedule(). Those symbols were deleted
+// alongside the loop. The tests are retained here as a REGRESSION NOTE: the
+// density-vs-raw-value ranking and the "prefer a down-tierable victim" logic
+// were correct in isolation and still work if the relax pass is ever re-wired.
+// They are intentionally commented out (the symbols they called no longer
+// exist); see the behavior-equivalence test below for the invariant the dead
+// loop was nominally guarding, now covered end-to-end through Schedule().
+//
+// (Original bodies preserved verbatim in comments for future reference.)
+//
+// func TestRelaxSpreadsAcrossFrontier(t *testing.T) {
+//	tasks := map[string]*tasktree.Task{
+//		"x": leaf("x", 31, opusSonnetHaiku(30_000, 12_000, 3_600)),
+//		"y": leaf("y", 30, opusSonnetHaiku(30_000, 12_000, 3_600)),
+//		"z": leaf("z", 29, opusSonnetHaiku(30_000, 12_000, 3_600)),
+//	}
+//	dec := func(id string) budget.Decision {
+//		tt := tasks[id]
+//		return budget.Decision{
+//			TaskID: id, Action: budget.Keep, Tier: tier.Opus,
+//			Budget: tt.EstAt(tier.Opus), Value: tt.ValueAt(tier.Opus),
+//		}
+//	}
+//	decisions := []budget.Decision{dec("x"), dec("y"), dec("z")}
+//	v1 := lowestMarginalRunning(decisions, tasks)
+//	if v1 == nil { t.Fatal("step 1: no victim selected") }
+//	for i := range decisions {
+//		if decisions[i].TaskID == v1.TaskID {
+//			relax(&decisions[i], tasks[v1.TaskID], nil, 1_000_000)
+//		}
+//	}
+//	v2 := lowestMarginalRunning(decisions, tasks)
+//	if v2 == nil { t.Fatal("step 2: no victim selected") }
+//	if v1.TaskID == v2.TaskID {
+//		t.Fatalf("relaxation re-selected the same task %q ...", v1.TaskID)
+//	}
+// }
+//
+// func TestRelaxPrefersDownTierableVictim(t *testing.T) {
+//	floored := &tasktree.Task{
+//		ID: "floored", Value: 8, Tiers: []tier.Tier{tier.Haiku},
+//		EstTokens: map[tier.Tier]int{tier.Haiku: 5_000},
+//	}
+//	roomy := leaf("roomy", 9, opusSonnetHaiku(30_000, 12_000, 3_600))
+//	tasks := map[string]*tasktree.Task{"floored": floored, "roomy": roomy}
+//	decisions := []budget.Decision{
+//		{TaskID: "floored", Action: budget.Keep, Tier: tier.Haiku, Budget: 5_000, Value: floored.ValueAt(tier.Haiku)},
+//		{TaskID: "roomy", Action: budget.Keep, Tier: tier.Opus, Budget: 30_000, Value: roomy.ValueAt(tier.Opus)},
+//	}
+//	v := lowestMarginalRunning(decisions, tasks)
+//	if v == nil || v.TaskID != "roomy" {
+//		got := "<nil>"; if v != nil { got = v.TaskID }
+//		t.Fatalf("expected down-tierable 'roomy' to be relaxed first, got %s", got)
+//	}
+// }
 
-	v1 := lowestMarginalRunning(decisions, tasks)
-	if v1 == nil {
-		t.Fatal("step 1: no victim selected")
-	}
-	// Relax the first victim in place (down-tier one step).
-	for i := range decisions {
-		if decisions[i].TaskID == v1.TaskID {
-			relax(&decisions[i], tasks[v1.TaskID], nil, 1_000_000)
+// exampleTree mirrors examples/overrun-tasktree.yaml: a realistic Claude Code
+// session whose naive all-top-tier demand (~287k tokens) overruns a 200k
+// window. refactor-config-loader is restricted to [sonnet, haiku]; all other
+// leaves run [opus, sonnet, haiku].
+func exampleTree() *tasktree.Task {
+	return tree(
+		leaf("design-oauth-flow", 95, opusSonnetHaiku(70_000, 28_000, 9_000)),
+		leaf("implement-token-exchange", 90, opusSonnetHaiku(60_000, 24_000, 8_000)),
+		leaf("write-integration-tests", 55, opusSonnetHaiku(50_000, 20_000, 6_500)),
+		&tasktree.Task{
+			ID:        "refactor-config-loader",
+			Value:     30,
+			Tiers:     []tier.Tier{tier.Sonnet, tier.Haiku},
+			EstTokens: map[tier.Tier]int{tier.Sonnet: 22_000, tier.Haiku: 7_000},
+		},
+		leaf("update-changelog", 8, opusSonnetHaiku(40_000, 16_000, 5_000)),
+		leaf("tidy-import-ordering", 3, opusSonnetHaiku(45_000, 18_000, 5_500)),
+	)
+}
+
+// TestScheduleBudgetInvariantHoldsWithoutRelaxLoop is the v0.5.0
+// behavior-equivalence proof for removing the dead relax loop. It runs Schedule()
+// across a battery of budgets — the same budgets the bug-hunter instrumented to
+// prove the loop never fired (under-run, the overrun knee, and deep overruns) —
+// and asserts the invariant the dead loop was supposed to enforce but never
+// needed, since greedy Allocate.place() already enforces it:
+//
+//	total(decisions) <= budgetTokens   for every budget.
+//
+// Removing the loop must not break this invariant; this test locks that in.
+func TestScheduleBudgetInvariantHoldsWithoutRelaxLoop(t *testing.T) {
+	root := exampleTree()
+	s := New(nil)
+	for _, b := range []int{50_000, 100_000, 150_000, 200_000, 300_000, 360_000, 1_000_000} {
+		p := s.Schedule(root, b)
+		if got := planTotal(p); got > b {
+			t.Fatalf("budget=%d: plan total %d exceeds budget (invariant broken after removing the relax loop)", b, got)
 		}
-	}
-	v2 := lowestMarginalRunning(decisions, tasks)
-	if v2 == nil {
-		t.Fatal("step 2: no victim selected")
-	}
-	if v1.TaskID == v2.TaskID {
-		t.Fatalf("relaxation re-selected the same task %q for both steps; "+
-			"expected the two steps to fall on different tasks", v1.TaskID)
+		for _, d := range p.Decisions {
+			if d.Budget < 0 {
+				t.Fatalf("budget=%d: decision %q has negative budget %d", b, d.TaskID, d.Budget)
+			}
+		}
 	}
 }
 
-// TestRelaxPrefersDownTierableVictim: when one running task is already on its
-// cheapest eligible tier (only preempt left) and another is still down-tierable,
-// the down-tierable one is relaxed first — shaving a tier frees tokens without
-// losing a task entirely.
-func TestRelaxPrefersDownTierableVictim(t *testing.T) {
-	floored := &tasktree.Task{
-		ID: "floored", Value: 8,
-		Tiers:     []tier.Tier{tier.Haiku}, // not down-tierable
-		EstTokens: map[tier.Tier]int{tier.Haiku: 5_000},
+// TestRelaxLoopRemovedFromScheduler proves the dead relax loop is physically
+// gone from scheduler.go (the grep -c == 0 assertion). If a future change
+// reintroduces `for total(decisions) > budgetTokens` or the lowestMarginalRunning
+// caller, this test fails and forces the author to reconcile with the fact
+// that Allocate() provably conserves budget.
+func TestRelaxLoopRemovedFromScheduler(t *testing.T) {
+	src, err := os.ReadFile("scheduler.go")
+	if err != nil {
+		t.Fatalf("read scheduler.go: %v", err)
 	}
-	roomy := leaf("roomy", 9, opusSonnetHaiku(30_000, 12_000, 3_600)) // down-tierable
-	tasks := map[string]*tasktree.Task{"floored": floored, "roomy": roomy}
-	decisions := []budget.Decision{
-		{TaskID: "floored", Action: budget.Keep, Tier: tier.Haiku, Budget: 5_000, Value: floored.ValueAt(tier.Haiku)},
-		{TaskID: "roomy", Action: budget.Keep, Tier: tier.Opus, Budget: 30_000, Value: roomy.ValueAt(tier.Opus)},
+	body := string(src)
+	if strings.Contains(body, "for total(decisions) > budgetTokens") {
+		t.Fatalf("scheduler.go still contains the unreachable relax loop " +
+			"`for total(decisions) > budgetTokens`; v0.5.0 removed it because " +
+			"Allocate.place() provably conserves budget (the condition is never true)")
 	}
-	v := lowestMarginalRunning(decisions, tasks)
-	if v == nil || v.TaskID != "roomy" {
-		got := "<nil>"
-		if v != nil {
-			got = v.TaskID
-		}
-		t.Fatalf("expected down-tierable 'roomy' to be relaxed first, got %s", got)
+	if strings.Contains(body, "lowestMarginalRunning") {
+		t.Fatalf("scheduler.go still references lowestMarginalRunning, which v0.5.0 removed from Schedule()")
+	}
+	if strings.Contains(body, "func total(") || strings.Contains(body, "func totalExcluding(") {
+		t.Fatalf("scheduler.go still defines total()/totalExcluding(), which v0.5.0 removed with the relax loop")
 	}
 }
 

@@ -26,3 +26,5 @@ PUBLISH_BLOCKED.md
 .builder_*
 .build_metadata*
 .stage_*
+_build_ctx.json
+_eval_*
