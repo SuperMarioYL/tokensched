@@ -8,6 +8,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -177,5 +178,9 @@ func parseBudget(s string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("invalid budget %q: want an integer or k/m-suffixed number (e.g. 200k)", s)
 	}
-	return int(f * mult), nil
+	// Round before truncating: the nearest float64 to a decimal input can sit
+	// just below the true value (e.g. 4.1 -> 4.0999999999999996), so a raw
+	// int(f * mult) truncates toward zero and silently under-counts the budget
+	// by one token for inputs like 4.1m/8.2m/32.3k.
+	return int(math.Round(f * mult)), nil
 }

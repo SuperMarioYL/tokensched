@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-08-21
+
+### Fixed
+
+- **`--budget` decimal-suffixed values no longer under-count by one token.**
+  `parseBudget` computed the budget as `int(f * mult)` where `f` came from
+  `strconv.ParseFloat` on the suffix-stripped string. For decimal-suffixed
+  inputs whose nearest `float64` sits just below the true decimal (e.g.
+  `4.1m`, `8.2m`, `32.3k`), the product landed a hair under the integer and
+  `int()` truncated toward zero, silently returning one token fewer than the
+  user typed with no error (`4.1m` -> `4,099,999` instead of `4,100,000`).
+  The README-documented examples (`200k`, `1.5m`) land on exact `float64`
+  representations and were unaffected, which is why this went unnoticed.
+  `parseBudget` now uses `math.Round`, so the explicit budget number is read
+  exactly for every decimal-suffixed input.
+
 ## [0.4.0] - 2026-07-17
 
 ### Added
@@ -124,6 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tier` cost/capability coefficients — so the allocator can be vendored into an
   agent harness.
 
+[0.6.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.6.0
 [0.4.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.4.0
 [0.3.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SuperMarioYL/tokensched/releases/tag/v0.2.0
