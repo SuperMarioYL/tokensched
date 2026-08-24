@@ -6,6 +6,7 @@ package tasktree
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"strings"
@@ -168,10 +169,12 @@ func decodeEstTokens(yt *yamlTask, tiers []tier.Tier) (map[tier.Tier]int, error)
 		}
 		// base is quoted at the top tier; scale by the cost coefficient ratio
 		// for the cheaper tiers so a single number still produces a sensible
-		// per-tier estimate.
+		// per-tier estimate. math.Round avoids the same float-truncation
+		// under-count the v0.6.0 parseBudget fix closed (e.g. base 33333 * Haiku
+		// ratio 0.12 = 3999.96, which int() would silently floor to 3999).
 		for _, tr := range tiers {
 			ratio := tr.CostMult() / top.CostMult()
-			out[tr] = int(float64(base) * ratio)
+			out[tr] = int(math.Round(float64(base) * ratio))
 		}
 	case yaml.MappingNode:
 		raw := map[string]int{}
@@ -239,7 +242,11 @@ func inferEstimate(want tier.Tier, have map[tier.Tier]int, tiers []tier.Tier) in
 		return 0
 	}
 	ratio := want.CostMult() / best.CostMult()
-	return int(float64(have[best]) * ratio)
+	// math.Round mirrors the v0.6.0 parseBudget fix and the scalar path above:
+	// int(float64(have[best]) * ratio) floors a hair-below-integer product
+	// (e.g. 13333 * 0.30 = 3999.9 -> 3999) and the opus->sonnet->haiku fill
+	// would otherwise compound the one-token loss.
+	return int(math.Round(float64(have[best]) * ratio))
 }
 
 // Validate enforces structural invariants over the whole tree:

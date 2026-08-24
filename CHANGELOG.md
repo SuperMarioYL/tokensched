@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-08-25
+
+### Fixed
+
+- **Per-tier `est_tokens` scaling no longer under-counts by one token.**
+  `decodeEstTokens` (scalar shorthand) and `inferEstimate` (the map fill loop)
+  computed per-tier estimates as `int(float64(base) * ratio)`, the same
+  float-truncation pattern `parseBudget` was fixed for in v0.6.0. When the
+  float product of the base estimate and the tier `CostMult` ratio (e.g. Haiku
+  0.12) landed a hair below the integer, `int()` truncated toward zero and
+  silently returned one token fewer than the ratio implied, with no error.
+  For a scalar `est_tokens: 33333` the Haiku tier returned `3999` instead of
+  `4000` (33333 * 0.12 = 3999.96); the same defect recurred on the inferred
+  path where the opus->sonnet->haiku fill could compound the one-token loss.
+  The existing `TestParseEstTokensScalarStillScales` only asserted Sonnet
+  (40000), whose 0.40 ratio sits above the integer, so the Haiku under-count
+  shipped uncaught. Both scaling sites now use `math.Round`, mirroring the
+  v0.6.0 `parseBudget` fix, and the regression is locked in with Haiku
+  assertions (`33333 -> 4000`) on both the scalar and inferred paths.
+
 ## [0.6.0] - 2026-08-21
 
 ### Fixed
