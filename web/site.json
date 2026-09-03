@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "content_version": "v0.6.0",
+  "content_version": "v0.8.0",
   "name": "tokensched",
   "github": "https://github.com/SuperMarioYL/tokensched",
   "host": "tokensched.lei6393.com",

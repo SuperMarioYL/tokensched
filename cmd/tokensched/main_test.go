@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -53,4 +56,65 @@ func TestParseBudgetErrors(t *testing.T) {
 			t.Errorf("parseBudget(%q) want error, got nil", in)
 		}
 	}
+}
+
+// TestVersionLockstep is the single-source-of-truth version guard: the version
+// var, the VERSION file, web/site.json content_version, and the CHANGELOG head
+// entry must all agree. This test fails on any tag where a version surface was
+// bumped without bumping the others — e.g. on the shipped v0.7.0 tag the
+// version var was v0.4.0-dev (3 minors behind), the VERSION file was 0.7.0, and
+// site.json was v0.6.0 (one minor behind). The v prefix is normalized away so
+// "v0.8.0" and "0.8.0" compare equal.
+func TestVersionLockstep(t *testing.T) {
+	want := strings.TrimPrefix(version, "v")
+
+	// VERSION file at the repo root (../../VERSION relative to cmd/tokensched/).
+	raw, err := os.ReadFile("../../VERSION")
+	if err != nil {
+		t.Fatalf("read VERSION file: %v", err)
+	}
+	fileVer := strings.TrimSpace(string(raw))
+	if fileVer != want {
+		t.Errorf("VERSION file = %q, want %q (version var = %q)", fileVer, want, version)
+	}
+
+	// web/site.json content_version.
+	siteBytes, err := os.ReadFile("../../web/site.json")
+	if err != nil {
+		t.Fatalf("read web/site.json: %v", err)
+	}
+	var sj struct {
+		ContentVersion string `json:"content_version"`
+	}
+	if err := json.Unmarshal(siteBytes, &sj); err != nil {
+		t.Fatalf("parse web/site.json: %v", err)
+	}
+	siteVer := strings.TrimPrefix(sj.ContentVersion, "v")
+	if siteVer != want {
+		t.Errorf("site.json content_version = %q, want %q", sj.ContentVersion, want)
+	}
+
+	// CHANGELOG.md head entry (## [X.Y.Z] - ...).
+	changelogBytes, err := os.ReadFile("../../CHANGELOG.md")
+	if err != nil {
+		t.Fatalf("read CHANGELOG.md: %v", err)
+	}
+	changelogVer := changelogHeadVersion(changelogBytes)
+	if changelogVer != want {
+		t.Errorf("CHANGELOG head version = %q, want %q", changelogVer, want)
+	}
+}
+
+// changelogHeadVersion extracts the version from the first "## [X.Y.Z]" line.
+func changelogHeadVersion(data []byte) string {
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "## [") {
+			rest := strings.TrimPrefix(line, "## [")
+			if idx := strings.Index(rest, "]"); idx >= 0 {
+				return rest[:idx]
+			}
+		}
+	}
+	return ""
 }

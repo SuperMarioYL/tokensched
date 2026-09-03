@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-04
+
+### Fixed
+
+- **Source builds now report the shipped version instead of a stale dev placeholder.**
+  `cmd/tokensched/main.go` held `var version = "v0.4.0-dev"` — a placeholder 3
+  minor versions behind the shipped v0.7.0 tag. Release builds overrode it via
+  goreleaser ldflags (`-X main.version={{.Version}}`), but a source build
+  (`go build ./cmd/tokensched` without ldflags) printed `tokensched v0.4.0-dev`.
+  The default now tracks the VERSION file so both paths agree, and a lockstep
+  version test (`TestVersionLockstep`) asserts the `version` var, the VERSION
+  file, `web/site.json` `content_version`, and the CHANGELOG head entry all
+  agree — the test fails on any tag where a surface is bumped without the
+  others.
+
+- **`web/site.json` `content_version` no longer lags one minor behind.**
+  The site's `content_version` was `"v0.6.0"` on the shipped v0.7.0 tag — the
+  v0.7.0 ship commit did not touch `site.json`, leaving the Pages site banner a
+  full minor behind for the entire v0.7.0 lifetime. Now bumped to `v0.8.0` and
+  covered by the lockstep version test so the drift cannot recur silently.
+
 ## [0.7.0] - 2026-08-25
 
 ### Fixed

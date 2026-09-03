@@ -21,8 +21,10 @@ import (
 )
 
 // version is overridable at build time with
-// -ldflags "-X main.version=vX.Y.Z".
-var version = "v0.4.0-dev"
+// -ldflags "-X main.version=vX.Y.Z". The default tracks the VERSION file so a
+// source build (go build ./cmd/tokensched without ldflags) still reports the
+// shipped version; goreleaser overrides it at release time.
+var version = "v0.8.0"
 
 func main() {
 	if err := newRootCmd().Execute(); err != nil {
