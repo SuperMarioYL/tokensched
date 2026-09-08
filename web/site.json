@@ -1,128 +1,215 @@
 {
-  "schema": 1,
-  "content_version": "v0.8.0",
+  "schema": 3,
   "name": "tokensched",
   "github": "https://github.com/SuperMarioYL/tokensched",
   "host": "tokensched.lei6393.com",
+  "palette": "auto",
   "lang": {
-    "primary": "zh",
+    "primary": "en",
     "toggle": true
   },
-  "accent": [
-    "#DC2626"
-  ],
+  "meta": {
+    "visual_style": "neon-particle",
+    "demo_source": "docs/demo-results.json"
+  },
   "hero": {
-    "eyebrow": {
-      "zh": "预算到顶就让路 · 抢占真的动手 · 数字两边对得上 · 配置错了当场报错",
-      "en": "Yields at the cap · Preempt actually fires · Numbers agree on both sides · Bad config fails fast"
-    },
     "headline": {
-      "zh": "你写的「抢占」策略只报告不动手——现在它真砍了\n到顶就让路，低价值工作被直接抢占，而不是悄悄降级",
-      "en": "Your 'preempt' policy only reported — now it actually cuts\nAt the cap, low-value work is preempted outright, not silently degraded"
+      "en": "Allocate the token budget before the task tree runs.",
+      "zh": "在任务树运行前分配 token 预算。"
     },
     "sub": {
-      "zh": "给长跑 Agent 写的一个 token 预算调度器。把一棵注定会撞墙的任务树交给它，它按子任务期望值预分配预算、预测超支，到顶时把低价值工作直接抢占掉（而不是只把它塞到便宜档位）。`run --json` 的超支与富余数字和终端报告完全一致；你在配置里写错的档位，当场就报错。到顶时的让路，就是它真正在跑的让路——没有一段永远开不起来的「兜底」步假装守住预算。",
-      "en": "A token-budget scheduler for long-running agents. Hand it a task tree that's bound to hit the wall — it pre-allocates the budget by sub-task value, predicts the overrun, and at the cap preempts low-value work outright (not just down-tiers it). `run --json`'s overrun and headroom numbers agree with the terminal report, and a tier you misconfigured in the tree fails fast. The yield at the cap is the yield it actually runs — no forever-dormant 'safety-net' step pretending to hold the budget."
+      "en": "TokenSched turns a declared task tree into a budget allocation and compares it with a naive highest-tier simulation.",
+      "zh": "TokenSched 将声明的任务树转换为预算分配，并与朴素最高档位模拟进行比较。"
     },
-    "command": "tokensched run tree.yaml --budget 200k --policy policy.yaml",
-    "cta": {
-      "zh": "开始使用",
-      "en": "Get started"
-    },
-    "ctaGithub": {
-      "zh": "在 GitHub 查看",
-      "en": "View on GitHub"
-    }
+    "href": "#quickstart"
   },
   "advantages": [
     {
       "title": {
-        "zh": "你写的「抢占」策略，现在真的动手了",
-        "en": "The 'preempt' policy you wrote now actually fires"
+        "en": "Budget before execution",
+        "zh": "执行前预算"
       },
       "body": {
-        "zh": "以前 `prefer_downtier` 旋钮接进了 CLI，却只让它在 `run --json` 里露个脸，调度器照旧先把低价值任务塞去便宜档位、再考虑抢占。现在把 `prefer_downtier` 设成 `false`，预算不够时分配器会直接抢占那个塞不下的子任务——丢掉它，而不是偷偷降级。紧预算砍掉的是低价值工作，而不是把所有工作都往下压一档。`run --json` 的 `policy.active` 也诚实地反映这次切换。",
-        "en": "The `prefer_downtier` knob was wired to the CLI but left reported-only — the scheduler always down-tiered the low-value task before ever preempting. Now set `prefer_downtier` to `false` and, when the budget can't cover a sub-task, the allocator preempts it outright — drops it, instead of quietly salvaging it on a cheaper tier. A tight budget drops low-priority work, rather than degrading every task by one notch. `run --json`'s `policy.active` honestly reflects the switch."
-      },
-      "chips": [
-        "› 抢占先于降档",
-        "› 低价值工作直接砍",
-        "› policy.active 诚实反映"
-      ]
+        "en": "Inspect expected demand before any model call.",
+        "zh": "模型调用前即可检查预期需求。"
+      }
     },
     {
       "title": {
-        "zh": "`run --json` 和终端报告，数字终于对得上了",
-        "en": "`run --json` and the terminal report finally agree"
+        "en": "Explain tier choices",
+        "zh": "解释档位选择"
       },
       "body": {
-        "zh": "以前 JSON 在预算还有富余时会吐一个原始的、可能是负数的 `overrun_tokens`（比如 -50000），终端报告却静悄悄地夹成 0、对富余只字不提——解析 JSON 的编排框架看见 -50000，根本分不清这是超支还是富余。现在两边都把 `overrun_tokens` 夹到非负，新增的 `headroom_tokens` 报告预算富余；终端报告也直说「朴素方案放得下，富余 N 个 token」。一个数字，两个出口，讲的是同一件事。",
-        "en": "The JSON used to emit a raw, possibly negative `overrun_tokens` when the tree fit the budget (say -50000), while the terminal report silently clamped it to 0 and never mentioned the surplus — so a harness parsing the JSON saw -50000 with no way to tell overrun from headroom. Both surfaces now clamp `overrun_tokens` to non-negative, a new `headroom_tokens` reports the budget surplus, and the terminal report says plainly 'naive plan fits — headroom N tokens'. One number, two surfaces, the same story."
-      },
-      "chips": [
-        "› overrun 夹到非负",
-        "› 新增 headroom_tokens",
-        "› 两边数字一致"
-      ]
+        "en": "Each task receives an explicit allocation action.",
+        "zh": "每个任务获得明确分配动作。"
+      }
     },
     {
       "title": {
-        "zh": "配置里写错的档位，当场报错",
-        "en": "A misconfigured tier fails fast"
+        "en": "Export decisions",
+        "zh": "导出决策"
       },
       "body": {
-        "zh": "一个子任务声明 `tiers: [opus]`，却给 `est_tokens: {haiku: 5000}`——以前工具默默存下这条 Haiku 估算、然后永远无视它（Haiku 根本不在允许档位里，从不会被选中），把你大概率想说的「Haiku 也可用」藏成一个静默错误，直到跑到一半才发现事情不对。现在 tasktree 直接拒绝这种配置，报错指名道姓点出那个不在档位列表里的 tier。",
-        "en": "A sub-task declaring `tiers: [opus]` but quoting `est_tokens: {haiku: 5000}` used to be stored silently and then ignored — Haiku is never selected because it isn't in the allowed tiers — hiding a misconfiguration you very likely meant as 'Haiku is eligible too', only to discover halfway through a run that something was off. The task tree now rejects this on parse, with an error that names the offending tier not in the list."
+        "en": "JSON can feed an external orchestrator.",
+        "zh": "JSON 可供外部编排器使用。"
+      }
+    }
+  ],
+  "demo": {
+    "title": {
+      "en": "Run it on a complete example",
+      "zh": "运行完整示例"
+    },
+    "note": {
+      "en": "Simulate the shipped six-task tree with a 200000-token budget and print the actual allocation report.",
+      "zh": "以 200000-token 预算模拟随仓六任务树，并打印实际分配报告。"
+    },
+    "source": "https://github.com/SuperMarioYL/tokensched/blob/main/docs/demo-results.json",
+    "steps": [
+      {
+        "label": "Recorded run",
+        "body": "Deterministic allocation simulation of the shipped six-task YAML tree under a 200000-token budget. Token and value results use declared estimates, not model execution or measured savings.",
+        "command": "python3 examples/presentation-demo.py",
+        "output": "{\n  \"budget\": 200000,\n  \"overrun_tokens\": 87000,\n  \"naive\": {\n    \"strategy\": \"hard-truncation\",\n    \"spent_tokens\": 180000,\n    \"value\": 240,\n    \"completed\": 3,\n    \"truncated\": 3,\n    \"decisions\": [\n      {\n        \"task_id\": \"design-oauth-flow\",\n        \"action\": \"keep\",\n        \"tier\": \"opus\",\n        \"budget_tokens\": 70000,\n        \"value\": 95,\n        \"reason\": \"ran on opus in declared order (no scheduling)\"\n      },\n      {\n        \"task_id\": \"implement-token-exchange\",\n        \"action\": \"keep\",\n        \"tier\": \"opus\",\n        \"budget_tokens\": 60000,\n        \"value\": 90,\n        \"reason\": \"ran on opus in declared order (no scheduling)\"\n      },\n      {\n        \"task_id\": \"write-integration-tests\",\n        \"action\": \"keep\",\n        \"tier\": \"opus\",\n        \"budget_tokens\": 50000,\n        \"value\": 55,\n        \"reason\": \"ran on opus in declared order (no scheduling)\"\n      },\n      {\n        \"task_id\": \"refactor-config-loader\",\n        \"action\": \"preempt\",\n        \"tier\": \"\",\n        \"budget_tokens\": 0,\n        \"value\": 0,\n        \"reason\": \"hard-truncated: budget exhausted before this task\"\n      },\n      {\n        \"task_id\": \"update-changelog\",\n        \"action\": \"preempt\",\n        \"tier\": \"\",\n        \"budget_tokens\": 0,\n        \"value\": 0,\n        \"reason\": \"hard-truncated: budget exhausted before this task\"\n      },\n      {\n        \"task_id\": \"tidy-import-ordering\",\n        \"action\": \"preempt\",\n        \"tier\": \"\",\n        \"budget_tokens\": 0,\n        \"value\": 0,\n        \"reason\": \"hard-truncated: budget exhausted before this task\"\n      }\n    ]\n  },\n  \"scheduled\": {\n    \"strategy\": \"scheduled\",\n    \"spent_tokens\": 197500,\n    \"value\": 258.45000000000005,\n    \"completed\": 6,\n    \"truncated\": 0,\n    \"decisions\": [\n      {\n        \"task_id\": \"design-oauth-flow\",\n        \"action\": \"keep\",\n        \"tier\": \"opus\",\n        \"budget_tokens\": 70000,\n        \"value\": 95,\n        \"reason\": \"fits on opus at 70000 tok (v/tok=0.00136); kept\"\n      },\n      {\n        \"task_id\": \"implement-token-exchange\",\n        \"action\": \"keep\",\n        \"tier\": \"opus\",\n        \"budget_tokens\": 60000,\n        \"value\": 90,\n        \"reason\": \"fits on opus at 60000 tok (v/tok=0.00150); kept\"\n      },\n      {\n        \"task_id\": \"write-integration-tests\",\n        \"action\": \"keep\",\n        \"tier\": \"opus\",\n        \"budget_tokens\": 50000,\n        \"value\": 55,\n        \"reason\": \"fits on opus at 50000 tok (v/tok=0.00110); kept\"\n      },\n      {\n        \"task_id\": \"refactor-config-loader\",\n        \"action\": \"down-tier\",\n        \"tier\": \"haiku\",\n        \"budget_tokens\": 7000,\n        \"value\": 13.5,\n        \"reason\": \"won't fit on sonnet (22000>20000 rem); down-tiered to haiku at 7000 tok\"\n      },\n      {\n        \"task_id\": \"update-changelog\",\n        \"action\": \"down-tier\",\n        \"tier\": \"haiku\",\n        \"budget_tokens\": 5000,\n        \"value\": 3.6,\n        \"reason\": \"won't fit on opus (40000>13000 rem); down-tiered to haiku at 5000 tok\"\n      },\n      {\n        \"task_id\": \"tidy-import-ordering\",\n        \"action\": \"down-tier\",\n        \"tier\": \"haiku\",\n        \"budget_tokens\": 5500,\n        \"value\": 1.35,\n        \"reason\": \"won't fit on opus (45000>8000 rem); down-tiered to haiku at 5500 tok\"\n      }\n    ]\n  },\n  \"tasks_saved\": 3\n}",
+        "image": "/assets/presentation/demo-0-light.svg",
+        "imageDark": "/assets/presentation/demo-0-dark.svg"
+      }
+    ]
+  },
+  "quickstart": {
+    "title": {
+      "en": "Try it locally",
+      "zh": "本地上手"
+    },
+    "body": {
+      "en": "Simulate the shipped six-task tree with a 200000-token budget and print the actual allocation report.",
+      "zh": "以 200000-token 预算模拟随仓六任务树，并打印实际分配报告。"
+    },
+    "steps": [
+      {
+        "title": {
+          "en": "Install from source",
+          "zh": "从源码安装"
+        },
+        "code": "git clone https://github.com/SuperMarioYL/tokensched.git\ncd tokensched\ngo build ./cmd/tokensched"
       },
-      "chips": [
-        "› 不在档位列表里的 tier 拒收",
-        "› 报错指名点姓",
-        "› 不再静默无视"
-      ]
+      {
+        "title": {
+          "en": "Run the included example",
+          "zh": "运行随仓示例"
+        },
+        "code": "python3 examples/presentation-demo.py"
+      }
+    ]
+  },
+  "limitations": [
+    {
+      "en": "run is a deterministic simulation, not a model execution loop. Counts and value scores derive from declared estimates and coefficients.",
+      "zh": "run 是确定性模拟，不是模型执行循环。数量与价值分数来自声明估计和系数。"
     },
     {
-      "title": {
-        "zh": "把硬截断，变成可调度的软退让",
-        "en": "Hard truncation, turned into a scheduled yield"
-      },
-      "body": {
-        "zh": "长跑 Agent 在用量窗口里跑一长串子任务，撞墙时被硬截断——而被截断的常常恰好是排在后面、最重要的那一段。tokensched 像调度 CPU 时间片一样调度 token 预算：按子任务期望值预分配，高价值子任务永远不是第一个被砍的；动手前就预测出朴素「全顶档」方案会超支多少；到顶时让低价值工作先让路，把高价值工作留在顶档上。它文档里写的让路，就是它真正在跑的让路——超支在预算分发时就地化解，没有一段永远开不起来的「兜底」步假装守住预算。整棵树跑在预算窗口内，而不是在窗口耗尽时丢掉最重要的一块。",
-        "en": "A long-running agent drives a chain of sub-tasks through a usage window and gets hard-truncated at the wall — and the truncated work is too often the most important piece, queued last. tokensched schedules the token budget the way an OS schedules CPU time-slices: it pre-allocates by sub-task expected value so a high-value task is never the first cut, predicts the naive all-top-tier overrun before it starts, and at the cap lets the low-value work yield first — keeping the high-value work on the top tier. The yield the docs describe is the yield the scheduler actually runs — overrun is absorbed on the spot as the budget is handed out, with no forever-dormant 'safety-net' step pretending to hold the line. The whole tree lands inside the budget window, instead of losing its most important piece when the window runs out."
-      },
-      "chips": [
-        "› 按期望值预分配",
-        "› 动手前预测超支",
-        "› 让路，说到做到"
-      ]
+      "en": "The CLI does not control an account’s usage windows or prevent an external harness from spending more than planned.",
+      "zh": "CLI 不控制账号用量窗口，也不能阻止外部框架消费超出计划。"
+    },
+    {
+      "en": "Tier value multipliers are assumptions, not measured model quality.",
+      "zh": "档位价值系数是假设，不是实测模型质量。"
     }
   ],
   "scene": {
-    "kind": "hub-nodes",
-    "nodes": [
-      "Phantom safety net",
-      "Reported-only preempt",
-      "Mismatched JSON",
-      "Hard truncation"
+    "kind": "neon-graph",
+    "fallback": "/assets/presentation/scene-dark.svg",
+    "fallbackLight": "/assets/presentation/scene-light.svg"
+  },
+  "story": {
+    "intro": {
+      "title": {
+        "en": "A concrete task",
+        "zh": "从实际任务出发"
+      },
+      "body": {
+        "en": "When estimated task demand exceeds a fixed budget, some work needs a lower tier or must wait. An explicit allocation shows those choices before a harness spends tokens.",
+        "zh": "预估任务需求超过固定预算时，一些工作需要降档或等待。显式分配可以在调用框架消费 token 前展示这些选择。"
+      }
+    },
+    "sections": [
+      {
+        "title": {
+          "en": "Follow the operation",
+          "zh": "处理过程"
+        },
+        "body": {
+          "en": "The YAML loader produces task leaves with value, estimated tokens and allowed tiers. The greedy allocator ranks value per token and places tasks under the remaining budget, down-tiering or preempting according to policy. The simulator compares the resulting decisions with a declared-order naive run.",
+          "zh": "YAML 加载器生成包含价值、预估 token 和可用档位的任务叶子。贪心分配器按单位 token 价值排序，在剩余预算内安排任务，根据策略降档或抢占。模拟器再与按声明顺序运行的朴素策略比较。"
+        },
+        "image": {
+          "light": "/assets/presentation/process-light.svg",
+          "dark": "/assets/presentation/process-dark.svg",
+          "alt": {
+            "en": "Follow the operation",
+            "zh": "处理过程"
+          }
+        }
+      },
+      {
+        "title": {
+          "en": "How TokenSched works",
+          "zh": "TokenSched 的工作方式"
+        },
+        "body": {
+          "en": "The YAML loader produces task leaves with value, estimated tokens and allowed tiers. The greedy allocator ranks value per token and places tasks under the remaining budget, down-tiering or preempting according to policy. The simulator compares the resulting decisions with a declared-order naive run.",
+          "zh": "YAML 加载器生成包含价值、预估 token 和可用档位的任务叶子。贪心分配器按单位 token 价值排序，在剩余预算内安排任务，根据策略降档或抢占。模拟器再与按声明顺序运行的朴素策略比较。"
+        },
+        "image": {
+          "light": "/assets/presentation/architecture-light.svg",
+          "dark": "/assets/presentation/architecture-dark.svg",
+          "alt": {
+            "en": "How TokenSched works",
+            "zh": "TokenSched 的工作方式"
+          }
+        }
+      },
+      {
+        "title": {
+          "en": "Connect the pieces",
+          "zh": "输入与输出"
+        },
+        "body": {
+          "en": "The following routes are implemented in the source. Choose the input that matches your task and keep the resulting artifact with your project.",
+          "zh": "以下路径已有源码实现。按任务选择输入，并把生成的结果与项目一起保存。"
+        },
+        "image": {
+          "light": "/assets/presentation/integrations-light.svg",
+          "dark": "/assets/presentation/integrations-dark.svg",
+          "alt": {
+            "en": "Connect the pieces",
+            "zh": "输入与输出"
+          }
+        }
+      }
+    ],
+    "details": [
+      {
+        "title": {
+          "en": "Configuration",
+          "zh": "配置"
+        },
+        "body": {
+          "en": "run requires a positive --budget. --policy reads preemption.prefer_downtier and preemption.preempt_below_value. Tier cost and capability coefficients in the implementation scale estimates; validate those assumptions for your workload before using the plan.",
+          "zh": "run 要求正值 --budget。--policy 读取 preemption.prefer_downtier 与 preemption.preempt_below_value。实现中的档位成本与能力系数缩放估计值；采用计划前应针对自己的负载验证假设。"
+        }
+      },
+      {
+        "title": {
+          "en": "Further use",
+          "zh": "进一步使用"
+        },
+        "body": {
+          "en": "The CLI exposes the following operations. Commands after the example use your own paths or identifiers.",
+          "zh": "CLI 提供以下操作。示例之外的命令需要替换成你的文件路径或标识。"
+        },
+        "code": "go run ./cmd/tokensched plan examples/overrun-tasktree.yaml --budget 200k\ngo run ./cmd/tokensched run examples/overrun-tasktree.yaml --budget 200k --json\ngo run ./cmd/tokensched run examples/overrun-tasktree.yaml --budget 200k --policy policy.example.yaml"
+      }
     ]
-  },
-  "cta": {
-    "headline": {
-      "zh": "一棵任务树 + 一份策略文件，守住你的 token 预算",
-      "en": "One task tree + one policy file, your token budget holds"
-    },
-    "sub": {
-      "zh": "开源、Apache-2.0、无付费墙。给 Agent 的 token 预算装调度器这件事，永不收费。",
-      "en": "Open source, Apache-2.0, no paywall. The act of scheduling your agent's token budget is never gated."
-    },
-    "button": {
-      "zh": "在 GitHub 上开始",
-      "en": "Get started on GitHub"
-    }
-  },
-  "footer": {
-    "tag": {
-      "zh": "给长跑 Agent 的 token 预算调度器",
-      "en": "The token-budget scheduler for long-running agents"
-    }
   }
 }

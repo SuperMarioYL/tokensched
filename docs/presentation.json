@@ -1,0 +1,78 @@
+{
+  "name": "tokensched",
+  "tagline": "Allocate the token budget before the task tree runs.",
+  "architecture": {
+    "title": "How TokenSched works",
+    "nodes": [
+      {
+        "title": "Task tree",
+        "detail": "internal/tasktree"
+      },
+      {
+        "title": "Policy / tiers",
+        "detail": "internal/policy; internal/tier"
+      },
+      {
+        "title": "Greedy allocation",
+        "detail": "internal/budget"
+      },
+      {
+        "title": "Simulation report",
+        "detail": "internal/sim; internal/report"
+      }
+    ],
+    "edges": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        3
+      ]
+    ]
+  },
+  "process": {
+    "title": "From input to a useful result",
+    "steps": [
+      {
+        "title": "Load task tree",
+        "detail": "Six declared leaf tasks"
+      },
+      {
+        "title": "Allocate budget",
+        "detail": "Tier choice or preemption"
+      },
+      {
+        "title": "Compare simulation",
+        "detail": "Naive and scheduled estimates"
+      }
+    ],
+    "result": "The output reports simulated allocation decisions and estimated token totals under the declared budget."
+  },
+  "integrations": {
+    "title": "Supported input and output routes",
+    "items": [
+      {
+        "title": "YAML task tree",
+        "detail": "Value, estimated tokens and tiers"
+      },
+      {
+        "title": "Budget flag",
+        "detail": "Integer or k/m suffix"
+      },
+      {
+        "title": "Policy YAML",
+        "detail": "Down-tier and value-floor choices"
+      },
+      {
+        "title": "JSON report",
+        "detail": "Per-task allocation decisions"
+      }
+    ]
+  }
+}
