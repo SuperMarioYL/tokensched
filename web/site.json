@@ -211,5 +211,6 @@
         "code": "go run ./cmd/tokensched plan examples/overrun-tasktree.yaml --budget 200k\ngo run ./cmd/tokensched run examples/overrun-tasktree.yaml --budget 200k --json\ngo run ./cmd/tokensched run examples/overrun-tasktree.yaml --budget 200k --policy policy.example.yaml"
       }
     ]
-  }
+  },
+  "content_version": "v0.8.0"
 }
